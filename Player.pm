@@ -25,8 +25,8 @@ my %Players;
 my %ActivePlayers;
 my %OwnerPlayers;  ## ( owner => [PlayerRef, PlayerRef] )
 my %MBTCache;
-my $MBTCacheSize = 0;
-my $MBTCacheMax = 2000000;
+my @MBTCacheSeq;
+my $MBTCacheMax = 1000000;
 
 our $Me = "Snowden's Nightmare";
 #our $Me = "Dewey Cheatham and Howe";
@@ -281,14 +281,17 @@ sub fillData {
 sub makeBestTeam {
     my ($Class, @Players) = @_;
     
+    ## In a bit to increase cache hits, sort players.
+#    @Players = sort @Players;
+    
     return($Class->_mbt(\@Players, [$Class->playSlots()]));
 }
 
-sub clearMBTCache {
-    undef %MBTCache;
-    warn("(Cache cleared)\n");
-    $MBTCacheSize = 0;
-}
+#  sub clearMBTCache {
+#      undef %MBTCache;
+#      warn("(Cache cleared)\n");
+#      $MBTCacheSize = 0;
+#  }
 
 sub _mbt {
     my ($Class, $PlayersRef, $SlotsRef) = @_;
@@ -300,35 +303,50 @@ sub _mbt {
         return(@{$MBTCache{$MBTCacheKey}});
     }
     
-    my ($Position, @Remainder) = @$SlotsRef;
+    my ($Player, @UnusedPlayers) = @$PlayersRef;
     my $BestScore;
     my @BestTeam;
     
-    for(my $Idx = 0; $Idx != @$PlayersRef; ++$Idx) {
-        my $Player = $PlayersRef->[$Idx];
+    ## Can we bench him?  If so, let's try that
+    if(@$PlayersRef > @$SlotsRef) {
+        my ($Score, $RetRef) = $Class->_mbt(\@UnusedPlayers, $SlotsRef);
+        
+        if(!defined($BestScore) ||
+           $Score > $BestScore) {
+            $BestScore = $Score;
+            @BestTeam = @$RetRef;
+            
+        }
+    }
+    
+    for(my $Idx = 0; $Idx != @$SlotsRef; ++$Idx) {
+        my $Position = $SlotsRef->[$Idx];
         next unless $Player->plays($Position);
-        my @UnusedPlayers = @$PlayersRef;
-        splice(@UnusedPlayers, $Idx, 1);
+        
+        my @Remainder = @$SlotsRef;
+        splice(@Remainder, $Idx, 1);
+        my ($Score, $RetRef) = $Class->_mbt(\@UnusedPlayers, \@Remainder);
+        next unless(defined($Score));
+        
         my $PlayerScore = $Player->isActive()
             ? $Player->fptsWtd()
             : 0.0;
         
-        my ($Score, $RetRef) = $Class->_mbt(\@UnusedPlayers, \@Remainder);
-        
-        next unless(defined($Score));
         $Score += $PlayerScore;
         if(!defined($BestScore) ||
            $Score > $BestScore) {
             $BestScore = $Score;
-            @BestTeam = ($Player, @$RetRef);
+            @BestTeam = @$RetRef;
+            splice(@BestTeam, $Idx, 0, $Player);
         }
     }
     
-    $MBTCacheSize += 1;
-    if($MBTCacheSize > $MBTCacheMax) {
-        $Class->clearMBTCache();
-    }
     $MBTCache{$MBTCacheKey} = [ $BestScore, \@BestTeam ];
+    push(@MBTCacheSeq, $MBTCacheKey);
+    
+    if(@MBTCacheSeq > $MBTCacheMax) {
+        delete($MBTCache{shift(@MBTCacheSeq)});
+    }
     
     return($BestScore, \@BestTeam);
 }
