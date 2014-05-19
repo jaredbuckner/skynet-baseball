@@ -1,0 +1,97 @@
+#!/bin/bash
+
+rm old_data/*
+mv data/* old_data/
+
+source config.pid
+
+wget="wget -w 5 --random-wait --retry-connrefused"
+##wget=echo
+wait_cmd='$a=int(rand(3)) + 3; print qq(Waiting $a ...\n); sleep $a'
+wait="eval perl -e '$wait_cmd'"
+fix_cmd='s/"\w+(?:\.\w+)*\(.*\);"/ /g'
+fix="eval perl -ape '$fix_cmd'"
+
+## Draft
+span=season
+
+## Season
+# span=restofseason
+
+#site=http://1fbl.baseball.cbssports.com/print/csv/stats/sortable
+site_base=http://1fbl.baseball.cbssports.com/print/csv
+site=${site_base}/stats/view
+#postfix=standard/stats
+#postfix=standard
+
+for position in C 1B 2B 3B SS OF U SP RP ; do
+    
+    echo "Working on $position ..."
+    
+##     $wget \
+##         --no-cookies \
+##         --header "Cookie: password_cache=$password_cache" \
+##         --header "Cookie: pid=$pid" \
+##         ${site}/all:$position/3yr:p/standard/stats \
+##         -O data/$position.3yr.raw
+##     
+##     $fix <data/$position.3yr.raw >data/$position.3yr.csv
+##     $wait
+##     
+     $wget \
+         --no-cookies \
+         --header "Cookie: password_cache=$password_cache" \
+         --header "Cookie: pid=$pid" \
+         ${site}/all:$position/ytd:p/standard/stats \
+         -O data/$position.ytd.raw
+     
+     $fix <data/$position.ytd.raw >data/$position.ytd.csv
+     
+     $wait
+     
+##     $wget \
+##         --no-cookies \
+##         --header "Cookie: password_cache=$password_cache" \
+##         --header "Cookie: pid=$pid" \
+##         ${site}/all:$position/7d:p/standard/projections \
+##         -O data/$position.7d.raw
+##     
+##     $fix <data/$position.7d.raw >data/$position.7d.csv
+##     $wait
+    
+    $wget \
+        --no-cookies \
+        --header "Cookie: password_cache=$password_cache" \
+        --header "Cookie: pid=$pid" \
+        ${site}/all:$position/${span}:p/standard/projections \
+        -O data/$position.restofseason.raw
+    
+    $fix <data/$position.restofseason.raw >data/$position.restofseason.csv
+    
+    $wait
+    
+    if [ "$position" = "U" ] ; then
+        alt_pos=DH
+    else
+        alt_pos=$position
+    fi
+    
+    $wget \
+        --no-cookies \
+        --header "Cookie: password_cache=$password_cache" \
+        --header "Cookie: pid=$pid" \
+        ${site_base}/players/depth-chart/$alt_pos \
+        -O data/$position.depth.csv
+    
+    $wait
+    
+done
+
+echo "Getting the injuries report..."
+
+$wget \
+        --no-cookies \
+        --header "Cookie: password_cache=$password_cache" \
+        --header "Cookie: pid=$pid" \
+        ${site_base}/injuries \
+        -O data/injuries.csv

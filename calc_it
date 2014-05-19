@@ -1,0 +1,9 @@
+#!/bin/bash
+
+rm old_reports/*
+mv reports/* old_reports/
+
+nice ./compare.pl > reports/player.list
+nice ./team_data.pl > reports/team.list
+nice ./agents.pl > reports/agents.list
+nice ./trades.pl > reports/trade.list

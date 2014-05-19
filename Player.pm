@@ -1,0 +1,482 @@
+## -*- perl -*-
+##
+## Common routines for handling player data
+##
+
+use strict;
+
+use Text::CSV;
+
+package Player;
+
+use constant I_NAME     => 0;  ## Currently "Name (TEAM)"
+use constant I_TEAM     => 1;  ## Not Currently Used
+use constant I_POS      => 2;
+use constant I_ACTIVE   => 3;
+use constant I_FPTS_YTD => 4;
+use constant I_FPTS_3YR => 5;
+use constant I_FPTS_7DY => 6;
+use constant I_FPTS_ROS => 7;
+use constant I_FPTS_WTD => 8;
+use constant I_OWNER    => 9;
+use constant I_END      => 10;
+
+my %Players;
+my %ActivePlayers;
+my %OwnerPlayers;  ## ( owner => [PlayerRef, PlayerRef] )
+my %MBTCache;
+my $MBTCacheSize = 0;
+my $MBTCacheMax = 2000000;
+
+our $Me = "Snowden's Nightmare";
+#our $Me = "Dewey Cheatham and Howe";
+
+sub new {
+    my ($Class, $Name, $Team) = @_;
+    
+    my $Self = [ $Name, $Team, {} ];
+    bless($Self, $Class);
+    $Players{$Name} = $Self;
+    return($Self);
+}
+
+sub allNames { return(keys %Players); }
+sub allPlayers { return(values %Players); }
+sub activeNames { return(keys %ActivePlayers); }
+sub activePlayers { return(values %ActivePlayers); }
+sub allOwners { return(keys %OwnerPlayers); }
+
+sub byName {
+    my ($Class, $Name) = @_;
+    return($Players{$Name});
+}
+
+sub byOwner {
+    my ($Class, $Owner) = @_;
+    return(@{$OwnerPlayers{$Owner}});
+}
+
+sub allPositions { return(qw (C 1B 2B 3B SS OF U SP RP)); }
+sub allSlots     { return(qw (C 1B 2B 3B SS OF OF OF U SP SP SP SP RP U SP SP SP)); }
+sub playSlots    { return(qw (C 1B 2B 3B SS OF OF OF U SP SP SP SP RP)); }
+
+sub name     { my ($Self) = @_; return($Self->[I_NAME]); }
+sub team     { my ($Self) = @_; return($Self->[I_TEAM]); }
+sub pos      { my ($Self) = @_; return(keys %{$Self->[I_POS]}); }
+sub isActive { my ($Self) = @_; return($Self->[I_ACTIVE]); }
+sub fptsYtd  { my ($Self) = @_; return($Self->[I_FPTS_YTD] || 0.0); }
+sub fpts3yr  { my ($Self) = @_; return($Self->[I_FPTS_3YR] || 0.0); }
+sub fpts7dy  { my ($Self) = @_; return($Self->[I_FPTS_7DY] || 0.0); }
+sub fptsRoS  { my ($Self) = @_; return($Self->[I_FPTS_ROS] || 0.0); }
+sub fptsWtd  { my ($Self) = @_; return($Self->[I_FPTS_WTD] || 0.0); }
+sub owner    { my ($Self) = @_; return($Self->[I_OWNER]); }
+
+sub plays    { my ($Self, $Pos) = @_; return(exists $Self->[I_POS]->{$Pos}); }
+sub addPos   { my ($Self, $Pos) = @_; $Self->[I_POS]->{$Pos} = 1; }
+
+sub isCompatable {
+    my ($Self, $Other) = @_;
+    for my $SelfPos ($Self->pos()) {
+        if($Other->plays($SelfPos)) {
+            return(1);
+        }
+    }
+    
+    return(0);
+}
+
+sub activate {
+    my ($Self) = @_;
+    $Self->[I_ACTIVE] = 1;
+    $ActivePlayers{$Self->[I_NAME]} = $Self;
+}
+
+sub chown {
+    my ($Self, $Owner) = @_;
+    
+    if(defined(my $OldOwner = $Self->[I_OWNER])) {
+        @{$OwnerPlayers{$OldOwner}} = grep { $_ != $Self } @{$OwnerPlayers{$OldOwner}};
+    }
+    $Self->[I_OWNER] = $Owner;
+    if(defined($Owner)) {
+        push(@{$OwnerPlayers{$Owner}}, $Self);
+    }
+}
+
+sub setFptsYtd {
+    my ($Self, $Fpts) = @_;
+    $Self->[I_FPTS_YTD] = $Fpts;
+    $Self->_reweigh();
+}
+
+sub setFpts3yr {
+    my ($Self, $Fpts) = @_;
+    $Self->[I_FPTS_3YR] = $Fpts;
+    $Self->_reweigh();
+}
+
+sub setFpts7dy {
+    my ($Self, $Fpts) = @_;
+    $Self->[I_FPTS_7DY] = $Fpts;
+    $Self->_reweigh();
+}
+
+sub setFptsRoS {
+    my ($Self, $Fpts) = @_;
+    $Self->[I_FPTS_ROS] = $Fpts;
+    $Self->_reweigh();
+}
+
+sub _reweight {
+    my ($Self) = @_;
+#    $Self->[I_FPTS_WTD] = 0.67 * $Self->fpts3yr() + 0.33 * $Self->fptsYtd();
+    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fpts7dy();
+    $Self->[I_FPTS_WTD] = $Self->fptsRoS();
+}
+
+sub loadYtdStats { _loadStats(@_, I_FPTS_YTD); }
+sub load3yrStats { _loadStats(@_, I_FPTS_3YR); }
+sub load7dyStats { _loadStats(@_, I_FPTS_7DY); }
+sub loadRoSStats { _loadStats(@_, I_FPTS_ROS); }
+
+sub _loadStats {
+    my ($Class, $FileHandle, $Position, $PTSIDX) = @_;
+    
+    my $CSVParser = Text::CSV->new();
+    my $FPTSIdx;
+    my $PlayerIdx;
+    my $TeamIdx;
+
+    while(defined(my $DatRef = $CSVParser->getline($FileHandle))) {
+        unless(defined($FPTSIdx) &&
+               defined($PlayerIdx) &&
+               defined($TeamIdx)) {
+            for(my $Idx = 0; $Idx != @$DatRef; ++$Idx) {
+                my $HeaderVal = $DatRef->[$Idx];
+                if($HeaderVal eq 'FPTS') {
+                    $FPTSIdx = $Idx;
+                } elsif($HeaderVal eq 'Player') {
+                    $PlayerIdx = $Idx;
+                } elsif($HeaderVal eq 'Team') {
+                    $TeamIdx = $Idx;
+                }
+            }
+            next;
+        }
+        
+        my ($Name, $Team, $FPTS) = @{$DatRef}[$PlayerIdx, $TeamIdx, $FPTSIdx];
+        
+        $Name = Player->_modName($Name);
+        
+        my $Player = $Class->byName($Name);
+        unless(defined($Player)) {
+            $Player = $Class->new($Name);
+        }
+        
+        $Player->addPos($Position);
+        $Player->[$PTSIDX] = $FPTS;
+        $Player->_reweight();
+        
+        if($Team ne 'Free Agent') {
+            $Player->chown($Team);
+        }
+    }
+}
+
+sub _modName {
+    my ($Class, $Name) = @_;
+    
+    my $WordsRx = qr/\S+(?:\s+\S+)*/;
+    $Name =~s/^\s*(${WordsRx})\s*,\s*(${WordsRx})\s+\S+\s+(\S+)\s*$/$2 $1 ($3)/;
+    
+    return($Name);
+}
+
+sub loadDepth {
+    my ($Class, $FileHandle) = @_;
+
+    my $CSVParser = Text::CSV->new();
+    my $MLBTeamIdx;
+    my @IdxOfInterest;
+    
+    while(defined(my $DatRef = $CSVParser->getline($FileHandle))) {
+        unless(defined($MLBTeamIdx)) {
+            for(my $Idx = 0; $Idx != @$DatRef; ++$Idx) {
+                my $HeaderVal = $DatRef->[$Idx];
+                if($HeaderVal eq 'Team') {
+                    $MLBTeamIdx = $Idx;
+                } elsif($HeaderVal eq 'Starter' ||
+                        $HeaderVal eq 'Starters' ||
+                        $HeaderVal eq 'Closer' ||
+                        $HeaderVal eq 'Set-up Man' ||
+                        $HeaderVal eq 'SP #1' ||
+                        $HeaderVal eq 'SP #2' ||
+                        $HeaderVal eq 'SP #3' ||
+                        $HeaderVal eq 'SP #4' ||
+                        $HeaderVal eq 'SP #5') {
+                    push(@IdxOfInterest, $Idx);
+                }
+            }
+            next;
+        }
+        
+        my ($MLBTeam,
+            @Players) = @{$DatRef}[$MLBTeamIdx,
+                                   @IdxOfInterest];
+        
+        next if($MLBTeam eq 'NL Teams' ||
+                $MLBTeam eq 'AL Teams' ||
+                $MLBTeam eq 'Team');
+
+        for my $PlayerString (@Players) {
+            next unless defined($PlayerString);
+            $PlayerString =~ s/ (ARI|ATL|CHC|CIN|COL|HOU|LAD|MIA|MIL|NYM|PHI|PIT|SD|SF|STL|WAS|BAL|BOS|CHW|CLE|DET|KC|LAA|MIN|NYY|OAK|SEA|TB|TEX|TOR)/ $1  /g;
+            $PlayerString =~ s/\s?\*\s|\s\(\d\)/  /g;
+            $PlayerString =~ s/^\s+//;
+            $PlayerString =~ s/\s+$//;
+            for my $Player (split(/\s{2,}/, $PlayerString)) {
+                $Player = $Class->_modName($Player);
+                # $Player .= " ($MLBTeam)";
+                my $PRef = $Class->byName($Player);
+                unless(defined($PRef)) {
+                    warn("Given playerstring $PlayerString, cannot activate $Player");
+                    next;
+                }
+                $PRef->activate();
+            }
+        }
+    }
+}
+
+sub fillData {
+    my ($Class, $DataDir) = @_;
+    
+    for my $Position ($Class->allPositions()) {
+##         open(DAT, "<$DataDir/$Position.ytd.csv") || die $!;
+##         Player->loadYtdStats(*DAT, $Position);
+##         close(DAT);
+##         
+##         open(DAT, "<$DataDir/$Position.3yr.csv") || die $!;
+##         Player->load3yrStats(*DAT, $Position);
+##         close(DAT);
+##         
+##         open(DAT, "<$DataDir/$Position.7d.csv") || die $!;
+##         Player->load7dyStats(*DAT, $Position);
+##         close(DAT);
+        
+        open(DAT, "<$DataDir/$Position.restofseason.csv") || die $!;
+        Player->loadRoSStats(*DAT, $Position);
+        close(DAT);
+    }
+    
+    ## Must load all players before attempting depth
+    for my $Position ($Class->allPositions()) {
+        open(DAT, "<$DataDir/$Position.depth.csv") || die $!;
+        Player->loadDepth(*DAT, $Position);
+        close(DAT);
+        
+    }
+}
+
+sub makeBestTeam {
+    my ($Class, @Players) = @_;
+    
+    return($Class->_mbt(\@Players, [$Class->playSlots()]));
+}
+
+sub clearMBTCache {
+    undef %MBTCache;
+    warn("(Cache cleared)\n");
+    $MBTCacheSize = 0;
+}
+
+sub _mbt {
+    my ($Class, $PlayersRef, $SlotsRef) = @_;
+    
+    return(0, []) unless(@$SlotsRef);
+    
+    my $MBTCacheKey = _mbtCacheKey($Class, $PlayersRef, $SlotsRef);
+    if(exists($MBTCache{$MBTCacheKey})) {
+        return(@{$MBTCache{$MBTCacheKey}});
+    }
+    
+    my ($Position, @Remainder) = @$SlotsRef;
+    my $BestScore;
+    my @BestTeam;
+    
+    for(my $Idx = 0; $Idx != @$PlayersRef; ++$Idx) {
+        my $Player = $PlayersRef->[$Idx];
+        next unless $Player->plays($Position);
+        my @UnusedPlayers = @$PlayersRef;
+        splice(@UnusedPlayers, $Idx, 1);
+        my $PlayerScore = $Player->isActive()
+            ? $Player->fptsWtd()
+            : 0.0;
+        
+        my ($Score, $RetRef) = $Class->_mbt(\@UnusedPlayers, \@Remainder);
+        
+        next unless(defined($Score));
+        $Score += $PlayerScore;
+        if(!defined($BestScore) ||
+           $Score > $BestScore) {
+            $BestScore = $Score;
+            @BestTeam = ($Player, @$RetRef);
+        }
+    }
+    
+    $MBTCacheSize += 1;
+    if($MBTCacheSize > $MBTCacheMax) {
+        $Class->clearMBTCache();
+    }
+    $MBTCache{$MBTCacheKey} = [ $BestScore, \@BestTeam ];
+    
+    return($BestScore, \@BestTeam);
+}
+
+## A unique value for the given entries.
+## These are designed to never collide.
+sub _mbtCacheKey {
+    my ($Class, $PlayersRef, $SlotsRef) = @_;
+    
+    return(join(',', @$PlayersRef, @$SlotsRef));
+}
+
+
+## sub generate_teams {
+##     my ($TeamsRef, $HashRef, $PosRef, $Period) = @_;
+##     
+##     $TeamsRef = {} unless(defined($TeamsRef));
+##     
+##     for my $PlayerName (keys %$HashRef) {
+##         my $Team = $HashRef->{$PlayerName}->{'team'};
+##         next if($Team eq 'Free Agent');
+##         
+##         my $FPTS = $HashRef->{$PlayerName}->{'period'}->{$Period}->{'fpts'};
+##         push(@{$TeamsRef->{$Team}->{'players'}}, $PlayerName);
+##         $TeamsRef->{$Team}->{'sum'} += $FPTS;
+##         if($HashRef->{$PlayerName}->{'active'}) {
+##             $TeamsRef->{$Team}->{'active'} += $FPTS;
+##         }
+##     }
+##     
+##     for my $Team (keys %$TeamsRef) {
+##         my @PNames = grep
+##         { $HashRef->{$_}->{'active'} } @{$TeamsRef->{$Team}->{'players'}};
+##         ($TeamsRef->{$Team}->{'rpts'},
+##          $TeamsRef->{$Team}->{'roster'}) = Player::best_team($HashRef,
+##                                                              \@PNames,
+##                                                              $PosRef,
+##                                                              $Period);
+##         $TeamsRef->{$Team}->{'rpts'} = 0 unless(defined($TeamsRef->{$Team}->{'rpts'}));
+##     }
+##     
+##     return($TeamsRef);
+## }
+
+## sub generate_trades {
+##     my ($TeamsRef, $BaseTeam, $HashRef, $PosRef, $Period, $AllowNeg) = @_;
+##     
+##     my @Trades;
+##     
+##     my @OtherTeams = grep { $_ ne $BaseTeam } keys %$TeamsRef;
+##     
+##     my @BasePlayers = sort @{$TeamsRef->{$BaseTeam}->{'players'}};
+##     my ($BaseRPTS) = Player::best_team($HashRef,
+##                                        \@BasePlayers,
+##                                        $PosRef, $Period);
+##     $BaseRPTS = 0 unless(defined($BaseRPTS));
+##     
+##     for my $OtherTeam (sort @OtherTeams) {
+##         my @OtherPlayers = sort @{$TeamsRef->{$OtherTeam}->{'players'}};
+##         my ($OtherRPTS) = Player::best_team($HashRef,
+##                                             \@OtherPlayers,
+##                                             $PosRef, $Period);
+##         $OtherRPTS = 0 unless(defined($OtherRPTS));
+##         
+##         for(my $BaseIdx = 0; $BaseIdx != @BasePlayers; ++$BaseIdx) {
+##             my $BasePlayer = $BasePlayers[$BaseIdx];
+##             warn("Offering $BasePlayer to $OtherTeam ...\n");
+##             my $BaseFPTS = $HashRef->{$BasePlayer}->{'period'}->{$Period}->{'fpts'};
+##             for(my $OtherIdx = 0; $OtherIdx != @OtherPlayers; ++$OtherIdx) {
+##                 my $OtherPlayer = $OtherPlayers[$OtherIdx];
+##                 warn("  Considering $OtherPlayer ...\n");
+##                 my $OtherFPTS = $HashRef->{$OtherPlayer}->{'period'}->{$Period}->{'fpts'};
+##                 
+##                 my $DelOtherFPTS = $BaseFPTS - $OtherFPTS;
+##                 next unless($AllowNeg || $DelOtherFPTS > 0);
+##                 
+##                 my @NewBasePlayers = @BasePlayers;
+##                 splice(@NewBasePlayers, $BaseIdx, 1, $OtherPlayer);
+##                 my ($NewBaseRPTS) = Player::best_team($HashRef,
+##                                                       \@NewBasePlayers,
+##                                                       $PosRef, $Period);
+##                 next unless(defined($NewBaseRPTS));
+## 
+##                 my $DelBaseRPTS = $NewBaseRPTS - $BaseRPTS;
+##                 next unless($DelBaseRPTS >= 0);
+##                 
+##                 my @NewOtherPlayers = @OtherPlayers;
+##                 splice(@NewOtherPlayers, $OtherIdx, 1, $BasePlayer);
+##                 my ($NewOtherRPTS) = Player::best_team($HashRef,
+##                                                        \@NewOtherPlayers,
+##                                                        $PosRef, $Period);
+##                 next unless(defined($NewOtherRPTS));
+##                 
+##                 my $DelOtherRPTS = $NewOtherRPTS - $OtherRPTS;
+##                 
+##                 next unless($DelOtherFPTS > 0 || $DelOtherRPTS > 0);
+##                 
+##                 my $AdvantageRPTS = $DelBaseRPTS - $DelOtherRPTS;
+##                 
+##                 next unless($AdvantageRPTS > $DelOtherFPTS);
+##                 
+##                 push(@Trades, [ $BasePlayer, $OtherPlayer, $OtherTeam, $DelBaseRPTS, $DelOtherFPTS, $AdvantageRPTS ]);
+##             }
+##         }
+##     }
+##     
+##     return(sort { $b->[3] <=> $a->[3] ||
+##                       $a->[4] <=> $b->[4] ||
+##                       $b->[5] <=> $a->[5] } @Trades);
+## }
+
+## sub must_get {
+##     my ($TeamsRef, $BaseTeam, $HashRef, $PosRef, $Period) = @_;
+##     
+##     my @BasePlayers = sort @{$TeamsRef->{$BaseTeam}->{'players'}};
+##     my ($BaseRPTS) = Player::best_team($HashRef,
+##                                        \@BasePlayers,
+##                                        $PosRef,
+##                                        $Period);
+##     $BaseRPTS = 0 unless(defined($BaseRPTS));
+##     
+##     my %Getters;
+##     for my $NewPlayerName (sort keys %$HashRef) {
+##         next unless($HashRef->{$NewPlayerName}->{'team'} eq 'Free Agent');
+##         next unless($HashRef->{$NewPlayerName}->{'active'});
+##         
+##         warn("Considering $NewPlayerName ...\n");
+##         my $NewPlayerScore = $HashRef->{$NewPlayerName}->{'period'}->{$Period}->{'fpts'};
+##         for(my $OldIdx = 0; $OldIdx != @BasePlayers; ++$OldIdx) {
+##             my $OldPlayer = $BasePlayers[$OldIdx];
+##             my $OldPlayerScore = $HashRef->{$OldPlayer}->{'period'}->{$Period}->{'fpts'};
+##             
+##             my @NewPlayers = @BasePlayers;
+##             $NewPlayers[$OldIdx] = $NewPlayerName;
+##             
+##             my ($NewRPTS) = Player::best_team($HashRef,
+##                                               \@NewPlayers,
+##                                               $PosRef,
+##                                               $Period);
+##             $NewRPTS = 0 unless(defined($NewRPTS));
+##             next unless($NewRPTS > $BaseRPTS ||
+##                         ($NewRPTS == $BaseRPTS &&
+##                          $NewPlayerScore > $OldPlayerScore));
+##             
+##             $Getters{$NewPlayerName}->{$OldPlayer} = $NewRPTS - $BaseRPTS;
+##         }
+##     }
+##     return(%Getters);
+## }
+
+1;
