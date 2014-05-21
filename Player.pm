@@ -91,6 +91,12 @@ sub activate {
     $ActivePlayers{$Self->[I_NAME]} = $Self;
 }
 
+sub deactivate {
+    my ($Self) = @_;
+    $Self->[I_ACTIVE] = 0;
+    delete $ActivePlayers{$Self->[I_NAME]};
+}
+
 sub chown {
     my ($Self, $Owner) = @_;
     
@@ -230,10 +236,9 @@ sub loadDepth {
 
         for my $PlayerString (@Players) {
             next unless defined($PlayerString);
-            $PlayerString =~ s/ (ARI|ATL|CHC|CIN|COL|HOU|LAD|MIA|MIL|NYM|PHI|PIT|SD|SF|STL|WAS|BAL|BOS|CHW|CLE|DET|KC|LAA|MIN|NYY|OAK|SEA|TB|TEX|TOR)/ $1  /g;
-            $PlayerString =~ s/\s?\*\s|\s\(\d\)/  /g;
-            $PlayerString =~ s/^\s+//;
-            $PlayerString =~ s/\s+$//;
+            
+            $PlayerString = $Class->_fixPlayerString($PlayerString);
+            
             for my $Player (split(/\s{2,}/, $PlayerString)) {
                 $Player = $Class->_modName($Player);
                 # $Player .= " ($MLBTeam)";
@@ -245,6 +250,55 @@ sub loadDepth {
                 $PRef->activate();
             }
         }
+    }
+}
+
+sub _fixPlayerString {
+    my ($Class, $PlayerString) = @_;
+    
+    $PlayerString =~ s/ (ARI|ATL|CHC|CIN|COL|HOU|LAD|MIA|MIL|NYM|PHI|PIT|SD|SF|STL|WAS|BAL|BOS|CHW|CLE|DET|KC|LAA|MIN|NYY|OAK|SEA|TB|TEX|TOR)/ $1  /g;
+    $PlayerString =~ s/\s?\*\s|\s\(\d\)/  /g;
+    $PlayerString =~ s/^\s+//;
+    $PlayerString =~ s/\s+$//;
+    
+    return($PlayerString);
+}
+
+sub loadInjury {
+    my ($Class, $FileHandle) = @_;
+    
+    my $CSVParser = Text::CSV->new();
+    my $PlayerIdx;
+    my $StatusIdx;
+    
+    while(defined(my $DatRef = $CSVParser->getline($FileHandle))) {
+        unless(defined($PlayerIdx)) {
+            for(my $Idx = 0; $Idx != @$DatRef; ++$Idx) {
+                my $HeaderVal = $DatRef->[$Idx];
+                if($HeaderVal eq 'Player') {
+                    $PlayerIdx = $Idx;
+                } elsif($HeaderVal eq 'Status') {
+                    $StatusIdx = $Idx;
+                }
+            }
+            next;
+        }
+        
+        my ($PlayerString, $Status) = @{$DatRef}[$PlayerIdx, $StatusIdx];
+        
+        next unless($Status eq 'DL' ||
+                    $Status eq 'Suspended' ||
+                    $Status eq 'Out');
+        next unless(defined($PlayerString));
+        $PlayerString = $Class->_modName($Class->_fixPlayerString($PlayerString));
+        my $Player = $Class->byName($PlayerString);
+        unless(defined($Player)) {
+            warn("Given playerstring ",
+                 $DatRef->[$PlayerIdx],
+                 ", cannot deactivate $PlayerString");
+            next;
+        }
+        $Player->deactivate();
     }
 }
 
@@ -276,6 +330,10 @@ sub fillData {
         close(DAT);
         
     }
+    
+    open(DAT, "<$DataDir/injuries.csv") || die $!;
+    Player->loadInjury(*DAT);
+    close(DAT);
 }
 
 sub makeBestTeam {
