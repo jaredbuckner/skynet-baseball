@@ -12,6 +12,8 @@ my %OwnerTeamScore;
 my %OwnerActiveScore;
 my %OwnerTotalScore;
 
+my %PlayerIsPlaying;
+
 for my $Owner ( Player->allOwners() ) {
     warn("Generating team data for $Owner...\n");
     my @Players = Player->byOwner($Owner);
@@ -19,6 +21,13 @@ for my $Owner ( Player->allOwners() ) {
     my ($TeamScore, $BestTeamRef) = Player->makeBestTeam(@Players);
     my $ActiveScore = 0;
     my $TotalScore = 0;
+    
+    if(defined($BestTeamRef)) {
+        my @PlaySlots = Player->playSlots();
+        for(my $Idx = 0; $Idx != @PlaySlots; ++$Idx) {
+            $PlayerIsPlaying{$BestTeamRef->[$Idx]} = (Player->playSlots())[$Idx];
+        }
+    }
     
     $ActiveScore += $_->fptsWtd() foreach(@ActivePlayers);
     $TotalScore += $_->fptsWtd() foreach(@Players);
@@ -46,10 +55,11 @@ for(my $OwnerIdx = 0; $OwnerIdx != @Owners; ++$OwnerIdx) {
     my @Players = sort { $b->fptsWtd() <=> $a->fptsWtd() } Player->byOwner($Owner);
     
     for my $Player (@Players) {
-        printf("%-30s %11s %1s %7.2f\n",
+        printf("%-30s %11s %1s %-2s %7.2f\n",
                $Player->name(),
                join(':', (sort $Player->pos())),
                ($Player->isActive() ? '*' : ''),
+               (defined($PlayerIsPlaying{$Player}) ? $PlayerIsPlaying{$Player} : ''),
                $Player->fptsWtd());
     }
     
