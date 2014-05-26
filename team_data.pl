@@ -22,10 +22,11 @@ for my $Owner ( Player->allOwners() ) {
     my $ActiveScore = 0;
     my $TotalScore = 0;
     
-    if(defined($BestTeamRef)) {
+    if(defined($TeamScore)) {
         my @PlaySlots = Player->playSlots();
+        
         for(my $Idx = 0; $Idx != @PlaySlots; ++$Idx) {
-            $PlayerIsPlaying{$BestTeamRef->[$Idx]} = (Player->playSlots())[$Idx];
+            $PlayerIsPlaying{$BestTeamRef->[$Idx]} = $PlaySlots[$Idx];
         }
     }
     
