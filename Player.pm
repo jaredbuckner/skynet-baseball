@@ -136,8 +136,8 @@ sub setFptsRoS {
 sub _reweight {
     my ($Self) = @_;
 #    $Self->[I_FPTS_WTD] = 0.67 * $Self->fpts3yr() + 0.33 * $Self->fptsYtd();
-    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fpts7dy();
-    $Self->[I_FPTS_WTD] = $Self->fptsRoS();
+#    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fpts7dy();
+    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fptsYtd();;
 }
 
 sub loadYtdStats { _loadStats(@_, I_FPTS_YTD); }
