@@ -112,25 +112,25 @@ sub chown {
 sub setFptsYtd {
     my ($Self, $Fpts) = @_;
     $Self->[I_FPTS_YTD] = $Fpts;
-    $Self->_reweigh();
+    $Self->_reweight();
 }
 
 sub setFpts3yr {
     my ($Self, $Fpts) = @_;
     $Self->[I_FPTS_3YR] = $Fpts;
-    $Self->_reweigh();
+    $Self->_reweight();
 }
 
 sub setFpts7dy {
     my ($Self, $Fpts) = @_;
     $Self->[I_FPTS_7DY] = $Fpts;
-    $Self->_reweigh();
+    $Self->_reweight();
 }
 
 sub setFptsRoS {
     my ($Self, $Fpts) = @_;
     $Self->[I_FPTS_ROS] = $Fpts;
-    $Self->_reweigh();
+    $Self->_reweight();
 }
 
 sub _reweight {
