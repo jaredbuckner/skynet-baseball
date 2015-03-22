@@ -171,6 +171,7 @@ sub _loadStats {
         }
         
         my ($Name, $Team, $FPTS) = @{$DatRef}[$PlayerIdx, $TeamIdx, $FPTSIdx];
+        next unless(defined($Name) && defined($Team) && defined($FPTS));
         
         $Name = Player->_modName($Name);
         
@@ -193,6 +194,7 @@ sub _modName {
     my ($Class, $Name) = @_;
     
     my $WordsRx = qr/\S+(?:\s+\S+)*/;
+    $Name =~ s/^\s*(${WordsRx})\s+\S+\s+\|\s+(\S+)\s*$/$1 ($2)/;
     $Name =~s/^\s*(${WordsRx})\s*,\s*(${WordsRx})\s+\S+\s+(\S+)\s*$/$2 $1 ($3)/;
     
     return($Name);
@@ -241,7 +243,7 @@ sub loadDepth {
             
             for my $Player (split(/\s{2,}/, $PlayerString)) {
                 $Player = $Class->_modName($Player);
-                # $Player .= " ($MLBTeam)";
+                $Player .= " ($MLBTeam)";
                 my $PRef = $Class->byName($Player);
                 unless(defined($PRef)) {
                     warn("Given playerstring $PlayerString, cannot activate $Player");
