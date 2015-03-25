@@ -1,11 +1,36 @@
 #!/usr/bin/perl -w
 
+use Getopt::Long;
+
 use strict;
 
 use lib '.';
 use Player;
 
+my $StrikeFile = "data/strike.list";
+
+my @StrikeThese;
+my @UnstrikeThese;
+
+unless(GetOptions("strike=s" => \@StrikeThese,
+                  "unstrike=s" => \@UnstrikeThese)) {
+    die("Error while reading options.\n");
+}
+
+if(@ARGV) {
+    die("Unknown options:  ", join(', ', @ARGV), "\n");
+}
+
 Player->fillData('data');
+
+my %AlreadyStruck;
+loadStrike($StrikeFile, \%AlreadyStruck);
+my $UpdatedStrike = 0;
+
+$UpdatedStrike |= strikePlayer($_, \%AlreadyStruck) foreach(@StrikeThese);
+$UpdatedStrike |= unstrikePlayer($_, \%AlreadyStruck) foreach(@UnstrikeThese);
+
+saveStrike($StrikeFile, \%AlreadyStruck) if($UpdatedStrike);
 
 ## How many owners will draft this season?
 my $DraftingOwners = 18;
@@ -69,13 +94,17 @@ for my $Pos (Player->allPositions()) {
 print "===== Position Order =====\n";
 for my $PPRef (@PlayersPos) {
     my ($Player, $Pos) = @$PPRef;
-    
-    printPlayer($Player, $Pos);
+
+    unless(exists($AlreadyStruck{$Player})) {
+        printPlayer($Player, $Pos);
+    }
 }
 
 print "\n\n===== Name Order\n";
 for my $Player (@ValuablePlayers) {
-    printPlayer($Player);
+    unless(exists($AlreadyStruck{$Player})) {
+        printPlayer($Player);
+    }
 }
 
 exit(0);
@@ -111,4 +140,82 @@ sub printPlayer {
     }
     
     print("\n");
+}
+
+sub matchPlayer {
+    my ($Expr) = @_;
+
+    $Expr =~ s/^\s+//;
+    $Expr =~ s/\s+$//;
+    
+    my $Player = Player->byName($Expr);
+    unless(defined($Player)) {
+        my @PMatches;
+        my $QMExpr = quotemeta($Expr);
+        for my $TryPlayer (Player->allPlayers()) {
+            if($TryPlayer->name() =~ /$QMExpr/i) {
+                push(@PMatches, $TryPlayer);
+            }
+        }
+
+        if(@PMatches == 0) {
+            die("No player matches name '$Expr'\n");
+        } elsif(@PMatches == 1) {
+            $Player = $PMatches[0];
+        } else {
+            die("Multiple matches for expression '$Expr': ",
+                join(', ', map {$_->name()} @PMatches),
+                "\n");
+        }
+    }
+    return($Player);    
+}
+
+sub strikePlayer {
+    my ($Expr, $StrikeMapRef) = @_;
+    my $Player = matchPlayer($Expr);
+    unless(exists($StrikeMapRef->{$Player})) {
+        $StrikeMapRef->{$Player} = $Player;
+        return(1);
+    }
+
+    warn("Cannot overstrike player ", $Player->name(), "\n");
+    return(0);
+}
+
+sub unstrikePlayer {
+    my ($Expr, $StrikeMapRef) = @_;
+    my $Player = matchPlayer($Expr);
+    if(exists($StrikeMapRef->{$Player})) {
+        delete $StrikeMapRef->{$Player};
+        return(1);
+    }
+
+    warn("Cannot understrike player ", $Player->name(), "\n");
+    return(0);
+}
+
+sub loadStrike {
+    my ($File, $StrikeMapRef) = @_;
+    if(open(SF, "<$File")) {
+        while(defined(my $Line = <SF>)) {
+            strikePlayer($Line, $StrikeMapRef);
+        }
+        
+        close(SF);
+    } else {
+        warn("Unable to read $File : $!\n");
+    }
+}
+
+sub saveStrike {
+    my ($File, $StrikeMapRef) = @_;
+    if(open(SF, ">$File")) {
+        for my $Player (values %$StrikeMapRef) {
+            print SF ($Player->name(), "\n");
+        }
+        close(SF);
+    } else {
+        die("Unable to write $File : $!\n");
+    }
 }
