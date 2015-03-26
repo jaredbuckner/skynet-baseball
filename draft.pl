@@ -102,7 +102,10 @@ for my $Pos (Player->allPositions()) {
     }
 }
 
-@PlayersPos = sort { slack(@$b) <=> slack(@$a) } @PlayersPos;
+@PlayersPos = sort { 
+    (slack(@$b) <=> slack(@$a))
+        || ($b->[0]->fptsWtd() <=> $a->[0]->fptsWtd())
+} @PlayersPos;
 
 
 print "===== Position Order =====\n";
