@@ -5,7 +5,7 @@
 
 use strict;
 
-use Text::CSV;
+use Text::CSV_XS;
 
 package Player;
 
@@ -148,7 +148,7 @@ sub loadRoSStats { _loadStats(@_, I_FPTS_ROS); }
 sub _loadStats {
     my ($Class, $FileHandle, $Position, $PTSIDX) = @_;
     
-    my $CSVParser = Text::CSV->new();
+    my $CSVParser = Text::CSV_XS->new();
     my $FPTSIdx;
     my $PlayerIdx;
     my $TeamIdx;
@@ -203,7 +203,7 @@ sub _modName {
 sub loadDepth {
     my ($Class, $FileHandle) = @_;
 
-    my $CSVParser = Text::CSV->new();
+    my $CSVParser = Text::CSV_XS->new();
     my $MLBTeamIdx;
     my @IdxOfInterest;
     
@@ -269,7 +269,7 @@ sub _fixPlayerString {
 sub loadInjury {
     my ($Class, $FileHandle) = @_;
     
-    my $CSVParser = Text::CSV->new();
+    my $CSVParser = Text::CSV_XS->new();
     my $PlayerIdx;
     my $StatusIdx;
     
