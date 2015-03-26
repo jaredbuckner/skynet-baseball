@@ -11,11 +11,26 @@ my $StrikeFile = "data/strike.list";
 
 my @StrikeThese;
 my @UnstrikeThese;
+my @HideThese;
 
-unless(GetOptions("strike=s" => \@StrikeThese,
+unless(GetOptions("hide=s" => \@HideThese,
+                  "strike=s" => \@StrikeThese,
                   "unstrike=s" => \@UnstrikeThese)) {
     die("Error while reading options.\n");
 }
+
+@HideThese = map { split(':', $_) } @HideThese;
+
+my %HideMap;
+for my $Hidden (@HideThese) {
+    unless(grep {uc ($Hidden) eq $_} Player->allPositions()) {
+        die("Unknown position:  $Hidden\n");
+    }
+    $HideMap{uc($Hidden)} = 1;
+}
+
+@StrikeThese = map { split(':', $_) } @StrikeThese;
+@UnstrikeThese = map { split(':', $_) } @UnstrikeThese;
 
 if(@ARGV) {
     die("Unknown options:  ", join(', ', @ARGV), "\n");
@@ -24,11 +39,10 @@ if(@ARGV) {
 Player->fillData('data');
 
 my %AlreadyStruck;
-loadStrike($StrikeFile, \%AlreadyStruck);
-my $UpdatedStrike = 0;
+my $UpdatedStrike = loadStrike($StrikeFile, \%AlreadyStruck);
 
-$UpdatedStrike |= strikePlayer($_, \%AlreadyStruck) foreach(@StrikeThese);
-$UpdatedStrike |= unstrikePlayer($_, \%AlreadyStruck) foreach(@UnstrikeThese);
+$UpdatedStrike ||= strikePlayer($_, \%AlreadyStruck) foreach(@StrikeThese);
+$UpdatedStrike ||= unstrikePlayer($_, \%AlreadyStruck) foreach(@UnstrikeThese);
 
 saveStrike($StrikeFile, \%AlreadyStruck) if($UpdatedStrike);
 
@@ -95,16 +109,12 @@ print "===== Position Order =====\n";
 for my $PPRef (@PlayersPos) {
     my ($Player, $Pos) = @$PPRef;
 
-    unless(exists($AlreadyStruck{$Player})) {
-        printPlayer($Player, $Pos);
-    }
+    printPlayer($Player, $Pos);
 }
 
 print "\n\n===== Name Order\n";
 for my $Player (@ValuablePlayers) {
-    unless(exists($AlreadyStruck{$Player})) {
-        printPlayer($Player);
-    }
+    printPlayer($Player);
 }
 
 exit(0);
@@ -117,6 +127,8 @@ sub slack {
 
 sub printPlayer {
     my ($Player, $Pos) = @_;
+    return if(exists($AlreadyStruck{$Player}) ||
+              (defined($Pos) && exists($HideMap{$Pos})));
     
     if(defined($Pos)) {
         printf("%-2s %6.2f  ",
@@ -197,15 +209,20 @@ sub unstrikePlayer {
 
 sub loadStrike {
     my ($File, $StrikeMapRef) = @_;
+    my $Rewrite = 0;
+    
     if(open(SF, "<$File")) {
         while(defined(my $Line = <SF>)) {
-            strikePlayer($Line, $StrikeMapRef);
+            $Rewrite ||= !strikePlayer($Line, $StrikeMapRef);
         }
         
         close(SF);
     } else {
         warn("Unable to read $File : $!\n");
+        $Rewrite = 1;
     }
+
+    return($Rewrite);
 }
 
 sub saveStrike {
