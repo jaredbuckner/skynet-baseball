@@ -19,7 +19,7 @@ unless(GetOptions("hide=s" => \@HideThese,
     die("Error while reading options.\n");
 }
 
-@HideThese = map { split(':', $_) } @HideThese;
+@HideThese = map { (split(':', $_)) } @HideThese;
 
 my %HideMap;
 for my $Hidden (@HideThese) {
@@ -29,8 +29,8 @@ for my $Hidden (@HideThese) {
     $HideMap{uc($Hidden)} = 1;
 }
 
-@StrikeThese = map { split(':', $_) } @StrikeThese;
-@UnstrikeThese = map { split(':', $_) } @UnstrikeThese;
+@StrikeThese = map { (split(':', $_)) } @StrikeThese;
+@UnstrikeThese = map { (split(':', $_)) } @UnstrikeThese;
 
 if(@ARGV) {
     die("Unknown options:  ", join(', ', @ARGV), "\n");
@@ -41,8 +41,15 @@ Player->fillData('data');
 my %AlreadyStruck;
 my $UpdatedStrike = loadStrike($StrikeFile, \%AlreadyStruck);
 
-$UpdatedStrike ||= strikePlayer($_, \%AlreadyStruck) foreach(@StrikeThese);
-$UpdatedStrike ||= unstrikePlayer($_, \%AlreadyStruck) foreach(@UnstrikeThese);
+foreach(@StrikeThese) {
+    my $DidStrike = strikePlayer($_, \%AlreadyStruck);
+    $UpdatedStrike ||= $DidStrike;
+}
+
+foreach(@UnstrikeThese) {
+    my $DidUnstrike = unstrikePlayer($_, \%AlreadyStruck);
+    $UpdatedStrike ||= $DidUnstrike;
+}
 
 saveStrike($StrikeFile, \%AlreadyStruck) if($UpdatedStrike);
 
@@ -216,7 +223,8 @@ sub loadStrike {
     
     if(open(SF, "<$File")) {
         while(defined(my $Line = <SF>)) {
-            $Rewrite ||= !strikePlayer($Line, $StrikeMapRef);
+            my $Result = strikePlayer($Line, $StrikeMapRef);
+            $Rewrite ||= !$Result;
         }
         
         close(SF);
