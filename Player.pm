@@ -242,14 +242,25 @@ sub loadDepth {
             $PlayerString = $Class->_fixPlayerString($PlayerString);
             
             for my $Player (split(/\s{2,}/, $PlayerString)) {
-                $Player = $Class->_modName($Player);
-                $Player .= " ($MLBTeam)";
-                my $PRef = $Class->byName($Player);
-                unless(defined($PRef)) {
-                    warn("Given playerstring $PlayerString, cannot activate $Player");
+                my @AllNamePieces = split(' ', $Player);
+                my @ThisNamePieces;
+                while(defined(my $Piece = shift(@AllNamePieces))) {
+                    push(@ThisNamePieces, $Piece);
+                    
+                    my $ThisPlayer = $Class->_modName(join(' ', @ThisNamePieces));
+                    $ThisPlayer .= " ($MLBTeam)";
+                    my $PRef = $Class->byName($ThisPlayer);
+                    if(defined($PRef)) {
+                        $PRef->activate();
+                        @ThisNamePieces = ();
+                    }
+                }
+                
+                if(@ThisNamePieces) {
+                    die("Given playerstring $PlayerString, cannot activate $Player using ",
+                        join(' ', @ThisNamePieces), "\n");
                     next;
                 }
-                $PRef->activate();
             }
         }
     }
@@ -295,9 +306,9 @@ sub loadInjury {
         $PlayerString = $Class->_modName($Class->_fixPlayerString($PlayerString));
         my $Player = $Class->byName($PlayerString);
         unless(defined($Player)) {
-            warn("Given playerstring ",
+            die("Given playerstring ",
                  $DatRef->[$PlayerIdx],
-                 ", cannot deactivate $PlayerString");
+                 ", cannot deactivate $PlayerString\n");
             next;
         }
         $Player->deactivate();
