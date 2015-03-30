@@ -72,6 +72,22 @@ for(my $OwnerIdx = 0; $OwnerIdx != @Owners; ++$OwnerIdx) {
         ($a->[4] - $a->[3]) <=> ($b->[4] - $b->[3])
 } @Trades;
 
+my $BNSize = 8;
+my $POSize = 2;
+for my $TradeRef (@Trades) {
+    my ($TradeTgtRef, $TradeForRef) = @$TradeRef;
+    for (my $I = 0; $I < @$TradeTgtRef; ++$I) {
+        for my $Name ($TradeTgtRef->[$I]->name(), $TradeForRef->[$I]->name()) {
+            $BNSize = length($Name) if(length($Name) > $BNSize);
+        }
+        for my $Pos (join(':', (sort $TradeTgtRef->[$I]->pos())),
+                     join(':', (sort $TradeForRef->[$I]->pos()))) {
+            $POSize = length($Pos) if (length($Pos) > $POSize);
+        }
+    }
+}
+
+
 for my $TradeRef (@Trades) {
     my ($TradeTgtRef, $TradeForRef, $WeBTSNew, $TheyBTSBase, $TheyBTSNew, $IsPareto) = @$TradeRef;
     
@@ -82,16 +98,24 @@ for my $TradeRef (@Trades) {
            $IsPareto ? 'P' : ' ' );
     
     for(my $I = 0; $I < @$TradeTgtRef; ++$I) {
-        printf("  [%7.2f] %-25s %11s <=> %-11s [%7.2f] %-25s\n",
+        printf("  [%7.2f] %s %-*s %*s <=> %-*s [%7.2f] %s %-*s\n",
                $TradeTgtRef->[$I]->fptsWtd(),
+               $TradeTgtRef->[$I]->isActive() ? '*' : ' ',
+               $BNSize,
                $TradeTgtRef->[$I]->name(),
+               $POSize,
                join(':', (sort $TradeTgtRef->[$I]->pos())),
+               $POSize,
                join(':', (sort $TradeForRef->[$I]->pos())),
                $TradeForRef->[$I]->fptsWtd(),
+               $TradeForRef->[$I]->isActive() ? '*' : ' ',
+               $BNSize,
                $TradeForRef->[$I]->name());
     }
 }
 
+
+exit(0);
 
 ## This counts through indices as follows, for max-size of 3
 ##   (0)
