@@ -51,6 +51,25 @@ sub byName {
     return($Players{$Name});
 }
 
+## Returns list of matches given a partial string
+sub byMatch {
+    my ($Class, $Expr) = @_;
+    
+    my $Player = Player->byName($Expr);
+    
+    return($Player) if defined($Player);
+    
+    my @PMatches;
+    my $QMExpr = quotemeta($Expr);
+    for my $TryPlayer (Player->allPlayers()) {
+        if($TryPlayer->name() =~ /$QMExpr/i) {
+            push(@PMatches, $TryPlayer);
+        }
+    }
+    
+    return(@PMatches);
+}
+
 sub byOwner {
     my ($Class, $Owner) = @_;
     return(@{$OwnerPlayers{$Owner}});

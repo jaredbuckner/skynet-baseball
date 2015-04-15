@@ -170,27 +170,17 @@ sub matchPlayer {
     $Expr =~ s/^\s+//;
     $Expr =~ s/\s+$//;
     
-    my $Player = Player->byName($Expr);
-    unless(defined($Player)) {
-        my @PMatches;
-        my $QMExpr = quotemeta($Expr);
-        for my $TryPlayer (Player->allPlayers()) {
-            if($TryPlayer->name() =~ /$QMExpr/i) {
-                push(@PMatches, $TryPlayer);
-            }
-        }
-
-        if(@PMatches == 0) {
-            die("No player matches name '$Expr'\n");
-        } elsif(@PMatches == 1) {
-            $Player = $PMatches[0];
-        } else {
-            die("Multiple matches for expression '$Expr': ",
-                join(', ', map {$_->name()} @PMatches),
-                "\n");
-        }
+    my @PMatches = Player->byMatch($Expr);
+    
+    if(@PMatches == 0) {
+        die("No player matches name '$Expr'\n");
+    } elsif(@PMatches == 1) {
+        return($PMatches[0]);
+    } else {
+        die("Multiple matches for expression '$Expr': ",
+            join(', ', map {$_->name()} @PMatches),
+            "\n");
     }
-    return($Player);    
 }
 
 sub strikePlayer {
