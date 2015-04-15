@@ -257,9 +257,32 @@ sub loadDepth {
                 }
                 
                 if(@ThisNamePieces) {
-                    die("Given playerstring $PlayerString, cannot activate $Player using ",
-                        join(' ', @ThisNamePieces), "\n");
-                    next;
+                    my @ReallyTryHardPieces = ();
+                  SL: while(defined(my $Piece = shift(@ThisNamePieces))) {
+                        for(my $Idx = 1; $Idx <= length($Piece); ++$Idx) {
+                            my $AlphaPiece = substr($Piece, 0, $Idx);
+                            my $BetaPiece = substr($Piece, $Idx);
+                            
+                            my $ThisPlayer = $Class->_modName(join(' ', @ReallyTryHardPieces, $AlphaPiece));
+                            $ThisPlayer .= " ($MLBTeam)";
+                            my $PRef = $Class->byName($ThisPlayer);
+                            if(defined($PRef)) {
+                                $PRef->activate();
+                                @ReallyTryHardPieces = ();
+                                if($BetaPiece ne '') {
+                                    unshift(@ThisNamePieces, $BetaPiece);
+                                }
+                                next SL;
+                            }                            
+                        }
+                        push(@ReallyTryHardPieces, $Piece);
+                    }
+                    
+                    if(@ReallyTryHardPieces) {
+                        die("Given playerstring $PlayerString, cannot activate $Player using ",
+                            join(' ', @ReallyTryHardPieces), "\n");
+                        next;
+                    }
                 }
             }
         }
