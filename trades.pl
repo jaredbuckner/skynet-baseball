@@ -215,9 +215,9 @@ sub updateParetoOptimal {
             $ThisWeBTSNew, $ThisTheyBTSBase, $ThisTheyBTSNew, $IsPareto) = @{$TradesRef->[$Idx]};
         next unless($IsPareto);
         next unless($ThisTradeForRef->[0]->owner() eq $Player);
-        
-        if($ThisWeBTSNew >= $LastWeBTSNew && $ThisTheyBTSNew > $LastTheyBTSBase ||
-           $ThisWeBTSNew > $LastWeBTSNew && $ThisTheyBTSNew >= $LastTheyBTSBase ) {
+
+        if($ThisWeBTSNew >= $LastWeBTSNew && $ThisTheyBTSNew > $LastTheyBTSNew ||
+           $ThisWeBTSNew > $LastWeBTSNew && $ThisTheyBTSNew >= $LastTheyBTSNew ) {
             $TradesRef->[$LastIdx]->[5] = 0;
             last;
         }
