@@ -75,9 +75,9 @@ sub byOwner {
     return(@{$OwnerPlayers{$Owner}});
 }
 
-sub allPositions { return(qw (C 1B 2B 3B SS OF U SP RP)); }
-sub allSlots     { return(qw (C 1B 2B 3B SS OF OF OF U SP SP SP SP RP U SP SP SP)); }
-sub playSlots    { return(qw (C 1B 2B 3B SS OF OF OF U SP SP SP SP RP)); }
+sub allPositions { return(qw (C 1B 2B SS 3B OF U SP RP)); }
+sub allSlots     { return(qw (C 1B 2B SS 3B OF OF OF U SP SP SP SP RP U SP SP SP)); }
+sub playSlots    { return(qw (C 1B 2B SS 3B OF OF OF U SP SP SP SP RP)); }
 
 sub name     { my ($Self) = @_; return($Self->[I_NAME]); }
 sub team     { my ($Self) = @_; return($Self->[I_TEAM]); }
@@ -124,7 +124,11 @@ sub chown {
     }
     $Self->[I_OWNER] = $Owner;
     if(defined($Owner)) {
-        push(@{$OwnerPlayers{$Owner}}, $Self);
+        if(exists($OwnerPlayers{$Owner})) {
+            @{$OwnerPlayers{$Owner}} = sort { $b->fptsWtd() <=> $a->fptsWtd() } (@{$OwnerPlayers{$Owner}}, $Self);
+        } else {
+            $OwnerPlayers{$Owner} = [$Self];
+        }
     }
 }
 
@@ -156,7 +160,12 @@ sub _reweight {
     my ($Self) = @_;
 #    $Self->[I_FPTS_WTD] = 0.67 * $Self->fpts3yr() + 0.33 * $Self->fptsYtd();
 #    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fpts7dy();
-    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fptsYtd();;
+    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fptsYtd();
+
+    my $Owner = $Self->owner();
+    if(defined($Owner) && exists($OwnerPlayers{$Owner})) {
+        @{$OwnerPlayers{$Owner}} = sort { $b->fptsWtd() <=> $a->fptsWtd() } @{$OwnerPlayers{$Owner}};
+    }
 }
 
 sub loadYtdStats { _loadStats(@_, I_FPTS_YTD); }
