@@ -26,7 +26,7 @@ my %ActivePlayers;
 my %OwnerPlayers;  ## ( owner => [PlayerRef, PlayerRef] )
 my %MBTCache;
 my @MBTCacheSeq;
-my $MBTCacheMax = 1000000;
+my $MBTCacheMax = 2000000;
 
 our $Me = "Snowden's Nightmare";
 #our $Me = "Dewey Cheatham and Howe";
