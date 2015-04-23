@@ -313,6 +313,7 @@ sub _fixPlayerString {
     
     $PlayerString =~ s/ (ARI|ATL|CHC|CIN|COL|HOU|LAD|MIA|MIL|NYM|PHI|PIT|SD|SF|STL|WAS|BAL|BOS|CHW|CLE|DET|KC|LAA|MIN|NYY|OAK|SEA|TB|TEX|TOR)/ $1  /g;
     $PlayerString =~ s/\s?\*\s|\s\(\d\)/  /g;
+    $PlayerString =~ s/\d+//g;
     $PlayerString =~ s/^\s+//;
     $PlayerString =~ s/\s+$//;
     
