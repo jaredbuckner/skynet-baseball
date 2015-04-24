@@ -17,6 +17,7 @@ $WeBTSBase = 0.0 unless(defined($WeBTSBase));
 my @Trades;
 
 my @Owners = sort Player->allOwners();
+my %OwnerTrades;
 
 for(my $OwnerIdx = 0; $OwnerIdx != @Owners; ++$OwnerIdx) {
     my $Owner = $Owners[$OwnerIdx];
@@ -91,6 +92,11 @@ for my $TradeRef (@Trades) {
 for my $TradeRef (@Trades) {
     my ($TradeTgtRef, $TradeForRef, $WeBTSNew, $TheyBTSBase, $TheyBTSNew, $IsPareto) = @$TradeRef;
     
+    if($IsPareto && $WeBTSNew - $WeBTSBase >= 10.0 &&
+        ($TheyBTSNew - $TheyBTSBase) / ($WeBTSNew - $WeBTSBase) <= 1.6) {
+        push(@{$OwnerTrades{$TradeForRef->[0]->owner()}}, $TradeRef);
+    }
+    
     printf("==== from %-26s [%+7.3f] vs [%+7.3f] %s ====\n",
            $TradeForRef->[0]->owner(),
            $WeBTSNew - $WeBTSBase,
@@ -114,8 +120,31 @@ for my $TradeRef (@Trades) {
     }
 }
 
+print "\n\n";
+
+for my $Owner (sort keys %OwnerTrades) {
+    print " ***** To $Owner *****\n";
+    my $OTSeqRef = $OwnerTrades{$Owner};
+    
+    while(@$OTSeqRef) {
+        my $Idx = int(rand(@$OTSeqRef));
+        my $TradeRef = splice(@$OTSeqRef, $Idx, 1);
+        
+        print(join(', ', map {playerNameAndPos($_)} @{$TradeRef->[0]}), "   for   ",
+              join(', ', map {playerNameAndPos($_)} @{$TradeRef->[1]}), "\n");
+    }
+    
+    print "\n";
+}
 
 exit(0);
+
+sub playerNameAndPos {
+    my ($Player) = @_;
+    return(sprintf("%s [%s]",
+                   $Player->name(),
+                   join(':', $Player->pos())));
+}
 
 ## This counts through indices as follows, for max-size of 3
 ##   (0)
