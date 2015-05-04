@@ -371,10 +371,10 @@ sub fillData {
     my ($Class, $DataDir) = @_;
     
     for my $Position ($Class->allPositions()) {
-##         open(DAT, "<$DataDir/$Position.ytd.csv") || die $!;
-##         Player->loadYtdStats(*DAT, $Position);
-##         close(DAT);
-##         
+         open(DAT, "<$DataDir/$Position.ytd.csv") || die $!;
+         Player->loadYtdStats(*DAT, $Position);
+         close(DAT);
+         
 ##         open(DAT, "<$DataDir/$Position.3yr.csv") || die $!;
 ##         Player->load3yrStats(*DAT, $Position);
 ##         close(DAT);
