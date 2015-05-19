@@ -6,4 +6,7 @@ mv reports/* old_reports/
 nice ./compare.pl > reports/player.list
 nice ./team_data.pl > reports/team.list
 nice ./agents.pl > reports/agents.list
-nice ./trades.pl > reports/trade.list
+
+nice xterm -e /bin/bash -c './trades.pl 2 > reports/trade_2.list' &
+nice xterm -e /bin/bash -c './trades.pl 3 > reports/trade_3.list' &
+

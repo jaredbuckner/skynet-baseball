@@ -7,7 +7,7 @@ use Player;
 
 Player->fillData('data');
 
-use constant CONSIDERATION => 2;
+use constant CONSIDERATION => (defined($ARGV[0]) ? $ARGV[0] : 2);
 
 ## By owner
 
@@ -97,11 +97,18 @@ for my $TradeRef (@Trades) {
         push(@{$OwnerTrades{$TradeForRef->[0]->owner()}}, $TradeRef);
     }
     
-    printf("==== from %-26s [%+7.3f] vs [%+7.3f] %s ====\n",
+    my $TradeDeltaForOther = 0.0;
+    for(my $I = 0; $I < @$TradeTgtRef; ++$I) {
+        $TradeDeltaForOther += $TradeTgtRef->[$I]->fptsWtd();
+        $TradeDeltaForOther -= $TradeForRef->[$I]->fptsWtd();
+    }
+    
+    printf("==== from %-26s [%+7.3f] vs [%+7.3f] %s (tdfo=%+7.3f) ====\n",
            $TradeForRef->[0]->owner(),
            $WeBTSNew - $WeBTSBase,
            $TheyBTSNew - $TheyBTSBase,
-           $IsPareto ? 'P' : ' ' );
+           $IsPareto ? 'P' : ' ',
+           $TradeDeltaForOther);
     
     for(my $I = 0; $I < @$TradeTgtRef; ++$I) {
         printf("  [%7.2f] %s %-*s %*s <=> %-*s [%7.2f] %s %-*s\n",
