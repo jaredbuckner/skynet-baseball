@@ -18,6 +18,7 @@ my @Trades;
 
 my @Owners = sort Player->allOwners();
 my %OwnerTrades;
+my %Besties;
 
 for(my $OwnerIdx = 0; $OwnerIdx != @Owners; ++$OwnerIdx) {
     my $Owner = $Owners[$OwnerIdx];
@@ -27,6 +28,28 @@ for(my $OwnerIdx = 0; $OwnerIdx != @Owners; ++$OwnerIdx) {
          sprintf('%5.2f', $OwnerIdx / @Owners * 100), ") ...\n");
     
     my @They = Player->byOwner($Owner);
+    
+    ## Determine their favorite players
+    {
+        my $TheyBestU;
+        my $TheyBestP;
+        for my $TheyPlay (@They) {
+            next unless($TheyPlay->isActive());
+            if($TheyPlay->plays('U')) {
+                if(!defined($TheyBestU) || $TheyBestU->fptsWtd() < $TheyPlay->fptsWtd()) {
+                    $TheyBestU = $TheyPlay;
+                }
+            } elsif($TheyPlay->plays('SP') || $TheyPlay->plays('RP')) {
+                if(!defined($TheyBestP) || $TheyBestP->fptsWtd() < $TheyPlay->fptsWtd()) {
+                    $TheyBestP = $TheyPlay;
+                }
+            }
+        }
+        
+        $Besties{$TheyBestU} = 1 if(defined($TheyBestU));
+        $Besties{$TheyBestP} = 1 if(defined($TheyBestP));
+    }
+    
     my ($TheyBTSBase) = Player->makeBestTeam(@They);
     $TheyBTSBase = 0.0 unless(defined($TheyBTSBase));
     
@@ -92,10 +115,14 @@ for my $TradeRef (@Trades) {
 for my $TradeRef (@Trades) {
     my ($TradeTgtRef, $TradeForRef, $WeBTSNew, $TheyBTSBase, $TheyBTSNew, $IsPareto) = @$TradeRef;
     
-    if($IsPareto && $WeBTSNew - $WeBTSBase >= 10.0 &&
-        ($TheyBTSNew - $TheyBTSBase) / ($WeBTSNew - $WeBTSBase) <= 1.6) {
-        push(@{$OwnerTrades{$TradeForRef->[0]->owner()}}, $TradeRef);
-    }
+  TRADEBLOCK: if($IsPareto && $WeBTSNew - $WeBTSBase >= 10.0 &&
+                 ($TheyBTSNew - $TheyBTSBase) / ($WeBTSNew - $WeBTSBase) <= 1.6) {
+      ## Check to see if any of the players are 'special'
+      for my $MaybeSpecialPlayer (@$TradeForRef) {
+          last TRADEBLOCK if(exists($Besties{$MaybeSpecialPlayer}));
+      }
+      push(@{$OwnerTrades{$TradeForRef->[0]->owner()}}, $TradeRef);
+  }
     
     my $TradeDeltaForOther = 0.0;
     for(my $I = 0; $I < @$TradeTgtRef; ++$I) {
@@ -121,7 +148,11 @@ for my $TradeRef (@Trades) {
                $POSize,
                join(':', (sort $TradeForRef->[$I]->pos())),
                $TradeForRef->[$I]->fptsWtd(),
-               $TradeForRef->[$I]->isActive() ? '*' : ' ',
+               exists($Besties{$TradeForRef->[$I]})
+                      ? '!'
+                      : $TradeForRef->[$I]->isActive()
+                      ? '*'
+                      : ' ',
                $BNSize,
                $TradeForRef->[$I]->name());
     }
