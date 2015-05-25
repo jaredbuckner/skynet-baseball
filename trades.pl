@@ -115,14 +115,21 @@ for my $TradeRef (@Trades) {
 for my $TradeRef (@Trades) {
     my ($TradeTgtRef, $TradeForRef, $WeBTSNew, $TheyBTSBase, $TheyBTSNew, $IsPareto) = @$TradeRef;
     
-  TRADEBLOCK: if($IsPareto && $WeBTSNew - $WeBTSBase >= 10.0 &&
-                 ($TheyBTSNew - $TheyBTSBase) / ($WeBTSNew - $WeBTSBase) <= 1.6) {
-      ## Check to see if any of the players are 'special'
-      for my $MaybeSpecialPlayer (@$TradeForRef) {
-          last TRADEBLOCK if(exists($Besties{$MaybeSpecialPlayer}));
-      }
-      push(@{$OwnerTrades{$TradeForRef->[0]->owner()}}, $TradeRef);
-  }
+    if($IsPareto && $WeBTSNew - $WeBTSBase >= 10.0 &&
+       ($TheyBTSNew - $TheyBTSBase) / ($WeBTSNew - $WeBTSBase) <= 1.6) {
+        ## Check to see if any of the players are 'special'
+        my $NotSpecial = 0;
+        for my $MaybeSpecialPlayer (@$TradeForRef) {
+            if(exists($Besties{$MaybeSpecialPlayer})) {
+                $NotSpecial = 1;
+                last;
+            }
+        }
+
+        unless($NotSpecial) {
+            push(@{$OwnerTrades{$TradeForRef->[0]->owner()}}, $TradeRef);
+        }
+    }
     
     my $TradeDeltaForOther = 0.0;
     for(my $I = 0; $I < @$TradeTgtRef; ++$I) {
