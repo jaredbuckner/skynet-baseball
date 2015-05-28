@@ -61,11 +61,15 @@ my %PositionDepth;
 my %PositionFill;
 my %PositionPlayers;  ## Empty position contains all players chosen
 
-for my $Pos (Player->allSlots()) {
+#my @FillSlots = Player->allSlots();
+my @FillSlots = Player->playSlots();
+
+for my $Pos (@FillSlots) {
     $PositionDepth{$Pos} += $DraftingOwners;
     $PositionFill{$Pos} = 0;
 }
 
+## For striking...
 print(join('  ', Player->allSlots()), "\n\n");
 
 ## Sort the players by fptsWtd
