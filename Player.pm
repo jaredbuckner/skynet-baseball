@@ -6,6 +6,7 @@
 use strict;
 
 use Text::CSV_XS;
+use Time::Local;
 
 package Player;
 
@@ -27,6 +28,9 @@ my %OwnerPlayers;  ## ( owner => [PlayerRef, PlayerRef] )
 my %MBTCache;
 my @MBTCacheSeq;
 my $MBTCacheMax = 2000000;
+
+## Fraction of the season completed
+my $SeasonFrac;
 
 our $Me = "Snowden's Nightmare";
 #our $Me = "Dewey Cheatham and Howe";
@@ -160,12 +164,26 @@ sub _reweight {
     my ($Self) = @_;
 #    $Self->[I_FPTS_WTD] = 0.67 * $Self->fpts3yr() + 0.33 * $Self->fptsYtd();
 #    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fpts7dy();
-    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fptsYtd();
-
+    $Self->[I_FPTS_WTD]
+        = (1.0 - $Self->seasonFrac()) * $Self->fptsRoS()
+        + $Self->fptsYtd()
+        - 0.5 * $Self->fpts7dy();
+    
     my $Owner = $Self->owner();
     if(defined($Owner) && exists($OwnerPlayers{$Owner})) {
         @{$OwnerPlayers{$Owner}} = sort { $b->fptsWtd() <=> $a->fptsWtd() } @{$OwnerPlayers{$Owner}};
     }
+}
+
+sub seasonFrac {
+    unless(defined($SeasonFrac)) {
+        my (undef, undef, undef,
+            $MDay, $Mon, $Year) = localtime();
+        my $SeasonStart = Time::Local::timelocal(0, 0, 0, 1, 3, $Year);
+        my $SeasonEnd = Time::Local::timelocal(0, 0, 0, 1, 7, $Year);
+        $SeasonFrac = (time() - $SeasonStart) / ($SeasonEnd - $SeasonStart);
+    }
+    return($SeasonFrac);
 }
 
 sub loadYtdStats { _loadStats(@_, I_FPTS_YTD); }
@@ -378,14 +396,14 @@ sub fillData {
 ##         open(DAT, "<$DataDir/$Position.3yr.csv") || die $!;
 ##         Player->load3yrStats(*DAT, $Position);
 ##         close(DAT);
-##         
-##         open(DAT, "<$DataDir/$Position.7d.csv") || die $!;
-##         Player->load7dyStats(*DAT, $Position);
-##         close(DAT);
-        
-        open(DAT, "<$DataDir/$Position.restofseason.csv") || die $!;
-        Player->loadRoSStats(*DAT, $Position);
-        close(DAT);
+         
+         open(DAT, "<$DataDir/$Position.7d.csv") || die $!;
+         Player->load7dyStats(*DAT, $Position);
+         close(DAT);
+         
+         open(DAT, "<$DataDir/$Position.restofseason.csv") || die $!;
+         Player->loadRoSStats(*DAT, $Position);
+         close(DAT);
     }
     
     ## Must load all players before attempting depth

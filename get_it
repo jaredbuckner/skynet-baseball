@@ -49,15 +49,15 @@ for position in C 1B 2B 3B SS OF U SP RP ; do
      
      $wait
      
-##     $wget \
-##         --no-cookies \
-##         --header "Cookie: password_cache=$password_cache" \
-##         --header "Cookie: pid=$pid" \
-##         ${site}/all:$position/7d:p/standard/projections \
-##         -O data/$position.7d.raw
-##     
-##     $fix <data/$position.7d.raw >data/$position.7d.csv
-##     $wait
+     $wget \
+         --no-cookies \
+         --header "Cookie: password_cache=$password_cache" \
+         --header "Cookie: pid=$pid" \
+         ${site}/all:$position/7d:p/standard/stats \
+         -O data/$position.7d.raw
+     
+     $fix <data/$position.7d.raw >data/$position.7d.csv
+     $wait
     
     $wget \
         --no-cookies \
