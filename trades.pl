@@ -168,7 +168,9 @@ for my $Owner (sort keys %OwnerTrades) {
     print " ***** To $Owner *****\n";
     my $OTSeqRef = $OwnerTrades{$Owner};
     
-    while(@$OTSeqRef) {
+    my $Seen = 0;
+    while($Seen < 7 && @$OTSeqRef) {
+        ++$Seen;
         my $Idx = int(rand(@$OTSeqRef));
         my $TradeRef = splice(@$OTSeqRef, $Idx, 1);
         
