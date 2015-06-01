@@ -180,8 +180,11 @@ sub seasonFrac {
         my (undef, undef, undef,
             $MDay, $Mon, $Year) = localtime();
         my $SeasonStart = Time::Local::timelocal(0, 0, 0, 1, 3, $Year);
-        my $SeasonEnd = Time::Local::timelocal(0, 0, 0, 1, 7, $Year);
-        $SeasonFrac = (time() - $SeasonStart) / ($SeasonEnd - $SeasonStart);
+        my $SeasonNow = Time::Local::timelocal(0, 0, 0, $MDay, $Mon, $Year);
+        my $SeasonEnd = Time::Local::timelocal(0, 0, 0, 1, 9, $Year);
+        $SeasonFrac = ($SeasonNow - $SeasonStart) / ($SeasonEnd - $SeasonStart);
+        $SeasonFrac = 0.0 if($SeasonFrac < 0.0);
+        $SeasonFrac = 1.0 if($SeasonFrac > 1.0);
     }
     return($SeasonFrac);
 }
