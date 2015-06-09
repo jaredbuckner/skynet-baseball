@@ -318,7 +318,7 @@ sub print_side {
                $IsLH ? $POS : '');        
     } else {
         printf("%*s",
-               4 + 7 + $BNSize + $POSize,
+               5 + 7 + $BNSize + $POSize,
                '');
     }
 }
