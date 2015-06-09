@@ -8,6 +8,7 @@ use Player;
 Player->fillData('data');
 
 use constant CONSIDERATION => (defined($ARGV[0]) ? $ARGV[0] : 2);
+use constant MUSTBECOMPAT => 0;
 
 ## By owner
 
@@ -70,7 +71,7 @@ for(my $OwnerIdx = 0; $OwnerIdx != @Owners; ++$OwnerIdx) {
             my @TradeForSet = @They[@TradeForIdxSet];            
             next unless(allActive(\@TradeForSet));
             
-            next unless(tradeCompatable(\@TradeTgtSet, \@TradeForSet));
+            next unless(!MUSTBECOMPAT || tradeCompatable(\@TradeTgtSet, \@TradeForSet));
             
             # warn("     for ", join(" ", map { $_->name } @TradeForSet), " ...\n");
             
@@ -100,12 +101,13 @@ my $BNSize = 8;
 my $POSize = 2;
 for my $TradeRef (@Trades) {
     my ($TradeTgtRef, $TradeForRef) = @$TradeRef;
-    for (my $I = 0; $I < @$TradeTgtRef; ++$I) {
-        for my $Name ($TradeTgtRef->[$I]->name(), $TradeForRef->[$I]->name()) {
+    
+    for my $TradeRef ($TradeTgtRef, $TradeForRef) {
+        for my $Entry (@$TradeRef) {
+            my $Name = $Entry->name();
             $BNSize = length($Name) if(length($Name) > $BNSize);
-        }
-        for my $Pos (join(':', (sort $TradeTgtRef->[$I]->pos())),
-                     join(':', (sort $TradeForRef->[$I]->pos()))) {
+            
+            my $Pos = join(':', (sort $Entry->pos()));
             $POSize = length($Pos) if (length($Pos) > $POSize);
         }
     }
@@ -129,11 +131,9 @@ for my $TradeRef (@Trades) {
     }
     
     my $TradeDeltaForOther = 0.0;
-    for(my $I = 0; $I < @$TradeTgtRef; ++$I) {
-        $TradeDeltaForOther += $TradeTgtRef->[$I]->fptsWtd();
-        $TradeDeltaForOther -= $TradeForRef->[$I]->fptsWtd();
-    }
-    
+    $TradeDeltaForOther += $_->fptsWtd() foreach(@$TradeTgtRef);
+    $TradeDeltaForOther -= $_->fptsWtd() foreach(@$TradeForRef);
+        
     printf("==== from %-26s [%+7.3f] vs [%+7.3f] %s (tdfo=%+7.3f) ====\n",
            $TradeForRef->[0]->owner(),
            $WeBTSNew - $WeBTSBase,
@@ -141,24 +141,15 @@ for my $TradeRef (@Trades) {
            $IsPareto ? 'P' : ' ',
            $TradeDeltaForOther);
     
-    for(my $I = 0; $I < @$TradeTgtRef; ++$I) {
-        printf("  [%7.2f] %s %-*s %*s <=> %-*s [%7.2f] %s %-*s\n",
-               $TradeTgtRef->[$I]->fptsWtd(),
-               $TradeTgtRef->[$I]->isActive() ? '*' : ' ',
-               $BNSize,
-               $TradeTgtRef->[$I]->name(),
-               $POSize,
-               join(':', (sort $TradeTgtRef->[$I]->pos())),
-               $POSize,
-               join(':', (sort $TradeForRef->[$I]->pos())),
-               $TradeForRef->[$I]->fptsWtd(),
-               exists($Besties{$TradeForRef->[$I]})
-                      ? '!'
-                      : $TradeForRef->[$I]->isActive()
-                      ? '*'
-                      : ' ',
-               $BNSize,
-               $TradeForRef->[$I]->name());
+    for(my $I = 0; $I < @$TradeTgtRef || $I < @$TradeForRef; ++$I) {
+        my $TgtEntry = $TradeTgtRef->[$I];
+        my $ForEntry = $TradeForRef->[$I];
+        
+        print("  ");
+        print_side($TgtEntry, 1, 0, $BNSize, $POSize);
+        print(" <=> ");
+        print_side($ForEntry, 0, defined($ForEntry) && exists($Besties{$ForEntry}), $BNSize, $POSize);
+        print("\n");
     }
 }
 
@@ -306,4 +297,28 @@ sub allActive {
     
     foreach(@$SeqRef) { return(0) unless $_->isActive(); }
     return(1);
+}
+
+sub print_side {
+    my ($Entry, $IsLH, $IsBest, $BNSize, $POSize) = @_;
+    
+    if($Entry) {
+        my $POS = join(':', (sort $Entry->pos()));
+        
+        printf("%-*s%s[%7.2f] %s %-*s%s%*s",
+               $IsLH ? 0 : $POSize,
+               $IsLH ? '' : $POS,
+               $IsLH ? '' : ' ',
+               $Entry->fptsWtd(),
+               $IsBest ? '!' : $Entry->isActive() ? '*' : ' ',
+               $BNSize,
+               $Entry->name(),
+               $IsLH ? '' : ' ',
+               $IsLH ? $POSize : 0,
+               $IsLH ? $POS : '');        
+    } else {
+        printf("%*s",
+               4 + 7 + $BNSize + $POSize,
+               '');
+    }
 }
