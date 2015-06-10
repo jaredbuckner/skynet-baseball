@@ -8,7 +8,7 @@ use Player;
 Player->fillData('data');
 
 use constant CONSIDERATION => (defined($ARGV[0]) ? $ARGV[0] : 2);
-use constant MUSTBECOMPAT => 0;
+use constant MUSTBECOMPAT => (defined($ARGV[1]) ? $ARGV[1] : 1);
 
 ## By owner
 

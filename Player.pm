@@ -15,7 +15,7 @@ use constant I_TEAM     => 1;  ## Not Currently Used
 use constant I_POS      => 2;
 use constant I_ACTIVE   => 3;
 use constant I_FPTS_YTD => 4;
-use constant I_FPTS_3YR => 5;
+use constant I_FPTS_21D => 5;
 use constant I_FPTS_7DY => 6;
 use constant I_FPTS_ROS => 7;
 use constant I_FPTS_WTD => 8;
@@ -88,7 +88,7 @@ sub team     { my ($Self) = @_; return($Self->[I_TEAM]); }
 sub pos      { my ($Self) = @_; return(keys %{$Self->[I_POS]}); }
 sub isActive { my ($Self) = @_; return($Self->[I_ACTIVE]); }
 sub fptsYtd  { my ($Self) = @_; return($Self->[I_FPTS_YTD] || 0.0); }
-sub fpts3yr  { my ($Self) = @_; return($Self->[I_FPTS_3YR] || 0.0); }
+sub fpts21d  { my ($Self) = @_; return($Self->[I_FPTS_21D] || 0.0); }
 sub fpts7dy  { my ($Self) = @_; return($Self->[I_FPTS_7DY] || 0.0); }
 sub fptsRoS  { my ($Self) = @_; return($Self->[I_FPTS_ROS] || 0.0); }
 sub fptsWtd  { my ($Self) = @_; return($Self->[I_FPTS_WTD] || 0.0); }
@@ -142,9 +142,9 @@ sub setFptsYtd {
     $Self->_reweight();
 }
 
-sub setFpts3yr {
+sub setFpts21d {
     my ($Self, $Fpts) = @_;
-    $Self->[I_FPTS_3YR] = $Fpts;
+    $Self->[I_FPTS_21D] = $Fpts;
     $Self->_reweight();
 }
 
@@ -162,12 +162,13 @@ sub setFptsRoS {
 
 sub _reweight {
     my ($Self) = @_;
-#    $Self->[I_FPTS_WTD] = 0.67 * $Self->fpts3yr() + 0.33 * $Self->fptsYtd();
+#    $Self->[I_FPTS_WTD] = 0.67 * $Self->fpts21d() + 0.33 * $Self->fptsYtd();
 #    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fpts7dy();
     $Self->[I_FPTS_WTD]
         = (1.0 - $Self->seasonFrac()) * $Self->fptsRoS()
         + $Self->fptsYtd()
-        - 0.5 * $Self->fpts7dy();
+        - 0.6 * $Self->fpts7dy()
+        + 0.2 * $Self->fpts21d();
     
     my $Owner = $Self->owner();
     if(defined($Owner) && exists($OwnerPlayers{$Owner})) {
@@ -190,7 +191,7 @@ sub seasonFrac {
 }
 
 sub loadYtdStats { _loadStats(@_, I_FPTS_YTD); }
-sub load3yrStats { _loadStats(@_, I_FPTS_3YR); }
+sub load21dStats { _loadStats(@_, I_FPTS_21D); }
 sub load7dyStats { _loadStats(@_, I_FPTS_7DY); }
 sub loadRoSStats { _loadStats(@_, I_FPTS_ROS); }
 
@@ -396,9 +397,9 @@ sub fillData {
          Player->loadYtdStats(*DAT, $Position);
          close(DAT);
          
-##         open(DAT, "<$DataDir/$Position.3yr.csv") || die $!;
-##         Player->load3yrStats(*DAT, $Position);
-##         close(DAT);
+         open(DAT, "<$DataDir/$Position.21d.csv") || die $!;
+         Player->load21dStats(*DAT, $Position);
+         close(DAT);
          
          open(DAT, "<$DataDir/$Position.7d.csv") || die $!;
          Player->load7dyStats(*DAT, $Position);

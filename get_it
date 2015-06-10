@@ -7,7 +7,7 @@ source config.pid
 
 wget="wget -w 5 --random-wait --retry-connrefused"
 ##wget=echo
-wait_cmd='$a=int(rand(3)) + 3; print qq(Waiting $a ...\n); sleep $a'
+wait_cmd='$a=int(rand(3)) + 1; print qq(Waiting $a ...\n); sleep $a'
 wait="eval perl -e '$wait_cmd'"
 fix_cmd='s/"\w+(?:\.\w+)*\(.*\);"/ /g'
 fix="eval perl -ape '$fix_cmd'"
@@ -57,6 +57,16 @@ for position in C 1B 2B 3B SS OF U SP RP ; do
          -O data/$position.7d.raw
      
      $fix <data/$position.7d.raw >data/$position.7d.csv
+     $wait
+    
+     $wget \
+         --no-cookies \
+         --header "Cookie: password_cache=$password_cache" \
+         --header "Cookie: pid=$pid" \
+         ${site}/all:$position/21d:p/standard/stats \
+         -O data/$position.21d.raw
+     
+     $fix <data/$position.21d.raw >data/$position.21d.csv
      $wait
     
     $wget \
