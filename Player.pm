@@ -22,6 +22,8 @@ use constant I_FPTS_WTD => 8;
 use constant I_OWNER    => 9;
 use constant I_END      => 10;
 
+use constant SEASON_PA  => 694.5;
+
 my %Players;
 my %ActivePlayers;
 my %OwnerPlayers;  ## ( owner => [PlayerRef, PlayerRef] )
@@ -196,12 +198,14 @@ sub load7dyStats { _loadStats(@_, I_FPTS_7DY); }
 sub loadRoSStats { _loadStats(@_, I_FPTS_ROS); }
 
 sub _loadStats {
-    my ($Class, $FileHandle, $Position, $PTSIDX) = @_;
+    my ($Class, $FileHandle, $Position, $PTSIDX, $Rebalance) = @_;
     
     my $CSVParser = Text::CSV_XS->new();
     my $FPTSIdx;
     my $PlayerIdx;
     my $TeamIdx;
+    my $ABIdx;
+    my $BBIdx;
 
     while(defined(my $DatRef = $CSVParser->getline($FileHandle))) {
         unless(defined($FPTSIdx) &&
@@ -215,6 +219,10 @@ sub _loadStats {
                     $PlayerIdx = $Idx;
                 } elsif($HeaderVal eq 'Team') {
                     $TeamIdx = $Idx;
+                } elsif($HeaderVal eq 'AB') {
+                    $ABIdx = $Idx;
+                } elsif($HeaderVal eq 'BB') {
+                    $BBIdx = $Idx;
                 }
             }
             next;
@@ -222,6 +230,9 @@ sub _loadStats {
         
         my ($Name, $Team, $FPTS) = @{$DatRef}[$PlayerIdx, $TeamIdx, $FPTSIdx];
         next unless(defined($Name) && defined($Team) && defined($FPTS));
+        
+        my $AB = (defined $ABIdx ? $DatRef->[$ABIdx] : undef);
+        my $BB = (defined $BBIdx ? $DatRef->[$BBIdx] : undef);
         
         $Name = Player->_modName($Name);
         
@@ -231,7 +242,16 @@ sub _loadStats {
         }
         
         $Player->addPos($Position);
-        $Player->[$PTSIDX] = $FPTS;
+        
+        if($Rebalance) {
+            if(defined($AB) && defined($BB)) {
+                $Player->[$PTSIDX] = $FPTS * SEASON_PA / ($AB + $BB + 1);
+            } else {
+                $Player->[$PTSIDX] = $FPTS;
+            }
+        } else {
+            $Player->[$PTSIDX] = $FPTS;
+        }
         $Player->_reweight();
         
         if($Team ne 'Free Agent') {
