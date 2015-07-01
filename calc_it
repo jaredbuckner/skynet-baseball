@@ -3,8 +3,7 @@
 rm old_reports/*
 mv reports/* old_reports/
 
-nice ./compare.pl > reports/player.list
-nice ./team_data.pl > reports/team.list
-nice ./agents.pl > reports/agents.list
-
-nice xterm -e /bin/bash -c './trades.pl 2 0 > reports/trade.list' &
+nice ./compare.pl > reports/player.list \
+    && nice ./team_data.pl > reports/team.list \
+    && nice ./agents.pl > reports/agents.list \
+    && nice ./trades.pl > reports/trade.list

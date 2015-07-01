@@ -5,10 +5,26 @@ use strict;
 use lib ".";
 use Player;
 
+use constant CONSIDERATION => 2;
+use constant MUSTBECOMPAT => 0;
+
 Player->fillData('data');
 
-use constant CONSIDERATION => (defined($ARGV[0]) ? $ARGV[0] : 2);
-use constant MUSTBECOMPAT => (defined($ARGV[1]) ? $ARGV[1] : 1);
+my %Force;
+
+for my $PName (map { ( split(':', $_)) } @ARGV) {
+    my @PMatches = Player->byMatch($PName);
+    
+    if(@PMatches == 0) {
+        die("No player matches '$PName'\n");
+    } elsif(@PMatches != 1) {
+        die("Multiple matches for '$PName':  ",
+            join(', ', map {$_->name()} @PMatches),
+            "\n");
+    } else {
+        $Force{$PMatches[0]} = 0;
+    }
+}
 
 ## By owner
 
@@ -59,6 +75,8 @@ for(my $OwnerIdx = 0; $OwnerIdx != @Owners; ++$OwnerIdx) {
         my @TradeTgtSet = @We[@TradeTgtIdxSet];
         next unless(allActive(\@TradeTgtSet));
         
+        use_force(\%Force, $_) foreach(@TradeTgtSet);
+        
         warn("   Offering ", join(" ", map { $_->name } @TradeTgtSet), " ...\n");
         
         my @TruncatedWe = @We;
@@ -71,7 +89,11 @@ for(my $OwnerIdx = 0; $OwnerIdx != @Owners; ++$OwnerIdx) {
             my @TradeForSet = @They[@TradeForIdxSet];            
             next unless(allActive(\@TradeForSet));
             
-            next unless(!MUSTBECOMPAT || tradeCompatable(\@TradeTgtSet, \@TradeForSet));
+            
+            use_force(\%Force, $_) foreach(@TradeForSet);
+            
+            next unless(clear_force(\%Force) &&
+                        (!MUSTBECOMPAT || tradeCompatable(\@TradeTgtSet, \@TradeForSet)));
             
             # warn("     for ", join(" ", map { $_->name } @TradeForSet), " ...\n");
             
@@ -133,7 +155,7 @@ for my $TradeRef (@Trades) {
     my $TradeDeltaForOther = 0.0;
     $TradeDeltaForOther += $_->fptsWtd() foreach(@$TradeTgtRef);
     $TradeDeltaForOther -= $_->fptsWtd() foreach(@$TradeForRef);
-        
+    
     printf("==== from %-26s [%+7.3f] vs [%+7.3f] %s (tdfo=%+7.3f) ====\n",
            $TradeForRef->[0]->owner(),
            $WeBTSNew - $WeBTSBase,
@@ -322,3 +344,26 @@ sub print_side {
                '');
     }
 }
+
+sub clear_force {
+    my ($FRef) = @_;
+    
+    my $WasAllForced = 1;
+    
+    for my $Key (keys %$FRef) {
+        my $VRef = \ ($FRef->{$Key});
+        $WasAllForced &&= $$VRef;
+        $$VRef = 0;
+    }
+    
+    return($WasAllForced);
+}
+
+sub use_force {
+    my ($FRef, $Player) = @_;
+    
+    if(exists($FRef->{$Player})) {
+        $FRef->{$Player} = 1;
+    }
+}
+
