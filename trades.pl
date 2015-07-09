@@ -324,14 +324,13 @@ sub updateParetoOptimal {
     my ($TradesRef) = @_;
     my $LastIdx = @$TradesRef - 1;
     
-    my ($LastTradeTgtRef, $LastTradeForRef,
-        $LastWeBTSNew, $LastTheyBTSBase, $LastTheyBTSNew) = @{$TradesRef->[$LastIdx]};
+    my (undef, $LastTradeForRef) = @{$TradesRef->[$LastIdx]};
     
     my $Player = $LastTradeForRef->[0]->owner();
     
     for(my $Idx = 0; $Idx != $LastIdx; ++$Idx) {
-        my ($ThisTradeTgtRef, $ThisTradeForRef,
-            $ThisWeBTSNew, $ThisTheyBTSBase, $ThisTheyBTSNew, $IsPareto) = @{$TradesRef->[$Idx]};
+        my (undef, $ThisTradeForRef,
+            undef, undef, undef, $IsPareto) = @{$TradesRef->[$Idx]};
         next unless($IsPareto);
         next unless($ThisTradeForRef->[0]->owner() eq $Player);
         
