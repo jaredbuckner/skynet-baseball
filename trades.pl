@@ -287,6 +287,39 @@ sub tradeCompatable {
     return(0);
 }
 
+## Returns <0 if the first trade is pareto-sub-optimal
+## Returns >0 if the second trade is pareto-sub-optimal
+## Returns =0 if both trades are pair-wise pareto
+sub paretoCompare {
+    my ($RefA, $RefB) = @_;
+    
+    my ($TgtRefA, $TgtForA, $WeBtsNewA, undef, $TheyBtsNewA) = @$RefA;
+    my ($TgtRefB, $TgtForB, $WeBtsNewB, undef, $TheyBtsNewB) = @$RefB;
+    
+    my $WeBtsCmp = ($WeBtsNewA <=> $WeBtsNewB);
+    my $TheyBtsCmp = ($TheyBtsNewA <=> $TheyBtsNewB);
+    
+    if($WeBtsCmp < 0 && $TheyBtsCmp <= 0 ||
+       $WeBtsCmp <= 0 && $TheyBtsCmp < 0) {
+        return(-1);
+    } elsif($WeBtsCmp > 0 && $TheyBtsCmp >= 0 ||
+            $WeBtsCmp >= 0 && $TheyBtsCmp > 0) {
+        return(1);
+    } elsif($WeBtsCmp == 0 && $TheyBtsCmp == 0) {
+        my $TgtRefCmp = (@$TgtRefA <=> @$TgtRefB);
+        my $TgtForCmp = (@$TgtForA <=> @$TgtForB);
+        if($TgtRefCmp > 0 && $TgtForCmp >=0 ||
+           $TgtRefCmp >= 0 && $TgtForCmp > 0) {
+            return(-1);
+        } elsif($TgtRefCmp < 0 && $TgtForCmp <=0 ||
+                $TgtRefCmp <=0 && $TgtForCmp <0) {
+            return(-1);
+        }
+    }
+    
+    return(0);
+}
+
 sub updateParetoOptimal {
     my ($TradesRef) = @_;
     my $LastIdx = @$TradesRef - 1;
@@ -301,14 +334,12 @@ sub updateParetoOptimal {
             $ThisWeBTSNew, $ThisTheyBTSBase, $ThisTheyBTSNew, $IsPareto) = @{$TradesRef->[$Idx]};
         next unless($IsPareto);
         next unless($ThisTradeForRef->[0]->owner() eq $Player);
-
-        if($ThisWeBTSNew >= $LastWeBTSNew && $ThisTheyBTSNew > $LastTheyBTSNew ||
-           $ThisWeBTSNew > $LastWeBTSNew && $ThisTheyBTSNew >= $LastTheyBTSNew ) {
+        
+        my $CmpVal = paretoCompare($TradesRef->[$LastIdx], $TradesRef->[$Idx]);
+        if($CmpVal < 0) {
             $TradesRef->[$LastIdx]->[5] = 0;
             last;
-        }
-        if($ThisWeBTSNew <= $LastWeBTSNew && $ThisTheyBTSNew < $LastTheyBTSNew ||
-           $ThisWeBTSNew < $LastWeBTSNew && $ThisTheyBTSNew <= $LastTheyBTSNew ) {
+        } elsif($CmpVal > 0) {
             $TradesRef->[$Idx]->[5] = 0;
         }
     }
