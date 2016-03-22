@@ -54,7 +54,7 @@ foreach(@UnstrikeThese) {
 saveStrike($StrikeFile, \%AlreadyStruck) if($UpdatedStrike);
 
 ## How many owners will draft this season?
-my $DraftingOwners = 18;
+my $DraftingOwners = 14;
 
 ## How many total players will be drafted for each position?
 my %PositionDepth;

@@ -82,8 +82,8 @@ sub byOwner {
 }
 
 sub allPositions { return(qw (C 1B 2B SS 3B OF U SP RP)); }
-sub allSlots     { return(qw (C 1B 2B SS 3B OF OF OF U SP SP SP SP RP U SP SP SP)); }
-sub playSlots    { return(qw (C 1B 2B SS 3B OF OF OF U SP SP SP SP RP)); }
+sub allSlots     { return(qw (C 1B 2B SS 3B OF OF OF U SP SP SP RP U SP SP)); }
+sub playSlots    { return(qw (C 1B 2B SS 3B OF OF OF U SP SP SP RP)); }
 
 sub name     { my ($Self) = @_; return($Self->[I_NAME]); }
 sub team     { my ($Self) = @_; return($Self->[I_TEAM]); }
@@ -217,7 +217,7 @@ sub _loadStats {
                     $FPTSIdx = $Idx;
                 } elsif($HeaderVal eq 'Player') {
                     $PlayerIdx = $Idx;
-                } elsif($HeaderVal eq 'Team') {
+                } elsif($HeaderVal eq 'Team' || $HeaderVal eq 'Avail') {
                     $TeamIdx = $Idx;
                 } elsif($HeaderVal eq 'AB') {
                     $ABIdx = $Idx;
@@ -254,7 +254,7 @@ sub _loadStats {
         }
         $Player->_reweight();
         
-        if($Team ne 'Free Agent') {
+        if($Team ne 'Free Agent' && $Team ne 'W ') {
             $Player->chown($Team);
         }
     }
