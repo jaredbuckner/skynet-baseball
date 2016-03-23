@@ -34,7 +34,7 @@ my $MBTCacheMax = 2000000;
 ## Fraction of the season completed
 my $SeasonFrac;
 
-our $Me = "Snowden's Nightmare";
+our $Me = "Skynet...";
 #our $Me = "Dewey Cheatham and Howe";
 
 sub new {
