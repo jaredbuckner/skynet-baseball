@@ -35,5 +35,4 @@ for(my $Week = 1; $Week <= $Weeks; ++$Week) {
     splice(@LIdx, 1, 0, splice(@LIdx, -1, 1));
 }
 
-
-    
+exit 0;
