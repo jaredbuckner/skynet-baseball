@@ -254,7 +254,8 @@ sub _loadStats {
         }
         $Player->_reweight();
         
-        if($Team ne 'Free Agent' && $Team ne 'W ') {
+        if($Team ne 'Free Agent' &&
+           ($Team !~ /^\s*W\s*(?:\(\s*\d+\s*\/\s*\d+\s*\)\s*)?$/)) {
             $Player->chown($Team);
         }
     }
@@ -319,6 +320,7 @@ sub loadDepth {
                     
                     my $ThisPlayer = $Class->_modName(join(' ', @ThisNamePieces));
                     $ThisPlayer .= " ($MLBTeam)";
+
                     my $PRef = $Class->byName($ThisPlayer);
                     if(defined($PRef)) {
                         $PRef->activate();
@@ -335,6 +337,7 @@ sub loadDepth {
                             
                             my $ThisPlayer = $Class->_modName(join(' ', @ReallyTryHardPieces, $AlphaPiece));
                             $ThisPlayer .= " ($MLBTeam)";
+                            
                             my $PRef = $Class->byName($ThisPlayer);
                             if(defined($PRef)) {
                                 $PRef->activate();
@@ -413,21 +416,22 @@ sub fillData {
     my ($Class, $DataDir) = @_;
     
     for my $Position ($Class->allPositions()) {
-         open(DAT, "<$DataDir/$Position.ytd.csv") || die $!;
-         Player->loadYtdStats(*DAT, $Position);
-         close(DAT);
-         
-         open(DAT, "<$DataDir/$Position.21d.csv") || die $!;
-         Player->load21dStats(*DAT, $Position);
-         close(DAT);
-         
-         open(DAT, "<$DataDir/$Position.7d.csv") || die $!;
-         Player->load7dyStats(*DAT, $Position);
-         close(DAT);
-         
-         open(DAT, "<$DataDir/$Position.restofseason.csv") || die $!;
-         Player->loadRoSStats(*DAT, $Position);
-         close(DAT);
+        warn("Loading data for $Position...\n");
+        open(DAT, "<$DataDir/$Position.ytd.csv") || die $!;
+        Player->loadYtdStats(*DAT, $Position);
+        close(DAT);
+        
+        open(DAT, "<$DataDir/$Position.21d.csv") || die $!;
+        Player->load21dStats(*DAT, $Position);
+        close(DAT);
+        
+        open(DAT, "<$DataDir/$Position.7d.csv") || die $!;
+        Player->load7dyStats(*DAT, $Position);
+        close(DAT);
+        
+        open(DAT, "<$DataDir/$Position.restofseason.csv") || die $!;
+        Player->loadRoSStats(*DAT, $Position);
+        close(DAT);
     }
     
     ## Must load all players before attempting depth
