@@ -7,6 +7,7 @@ use Player;
 
 use constant CONSIDERATION => 2;
 use constant MUSTBECOMPAT => 0;
+use constant EQNUM => 1;
 
 Player->fillData('data');
 
@@ -93,7 +94,8 @@ for(my $OwnerIdx = 0; $OwnerIdx != @Owners; ++$OwnerIdx) {
             use_force(\%Force, $_) foreach(@TradeForSet);
             
             next unless(clear_force(\%Force) &&
-                        (!MUSTBECOMPAT || tradeCompatable(\@TradeTgtSet, \@TradeForSet)));
+                        (!MUSTBECOMPAT || tradeCompatable(\@TradeTgtSet, \@TradeForSet)) &&
+                        (!EQNUM || @TradeTgtSet == @TradeForSet));
             
             # warn("     for ", join(" ", map { $_->name } @TradeForSet), " ...\n");
             
