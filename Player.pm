@@ -82,8 +82,8 @@ sub byOwner {
 }
 
 sub allPositions { return(qw (C 1B 2B SS 3B OF U SP RP)); }
-sub allSlots     { return(qw (C 1B 2B SS 3B OF OF OF U SP SP SP RP U SP SP)); }
-sub playSlots    { return(qw (C 1B 2B SS 3B OF OF OF U SP SP SP RP)); }
+sub allSlots     { return(qw (C 1B 2B SS 3B OF OF OF U SP SP SP SP RP RP U U SP)); }
+sub playSlots    { return(qw (C 1B 2B SS 3B OF OF OF U SP SP SP SP RP RP)); }
 
 sub name     { my ($Self) = @_; return($Self->[I_NAME]); }
 sub team     { my ($Self) = @_; return($Self->[I_TEAM]); }
@@ -164,13 +164,15 @@ sub setFptsRoS {
 
 sub _reweight {
     my ($Self) = @_;
+    $Self->[I_FPTS_WTD] = $Self->fptsRoS() / 154.87 * 2484.0;
+        
 #    $Self->[I_FPTS_WTD] = 0.67 * $Self->fpts21d() + 0.33 * $Self->fptsYtd();
 #    $Self->[I_FPTS_WTD] = $Self->fptsRoS() + $Self->fpts7dy();
-    $Self->[I_FPTS_WTD]
-        = (1.0 - $Self->seasonFrac()) * $Self->fptsRoS()
-        + $Self->fptsYtd()
-        - 0.6 * $Self->fpts7dy()
-        + 0.2 * $Self->fpts21d();
+#    $Self->[I_FPTS_WTD]
+#        = (1.0 - $Self->seasonFrac()) * $Self->fptsRoS()
+#        + $Self->fptsYtd()
+#        - 0.6 * $Self->fpts7dy()
+#        + 0.2 * $Self->fpts21d();
     
     my $Owner = $Self->owner();
     if(defined($Owner) && exists($OwnerPlayers{$Owner})) {
@@ -204,9 +206,19 @@ sub _loadStats {
     my $FPTSIdx;
     my $PlayerIdx;
     my $TeamIdx;
-    my $ABIdx;
-    my $BBIdx;
 
+    my $RIdx;     my $RWgt    = 1.0 / 38.0;
+    my $HrIdx;    my $HrWgt   = 1.0 / 23.0;
+    my $RbiIdx;   my $RbiWgt  = 1.0 / 38.0;
+    my $SbIdx;    my $SbWgt   = 1.0 / 56.0;
+    my $ObpIdx;   my $ObpWgt  = 1.0 / 0.10;
+    
+    my $WIdx;     my $WWgt    = 1.0 / 11.0;
+    my $SIdx;     my $SWgt    = 1.0 / 24.0;
+    my $KIdx;     my $KWgt    = 1.0 / 101.0;
+    my $EraIdx;   my $EraWgt  = 1.0 / 1.14;
+    my $WhipIdx;  my $WhipWgt = 1.0 / 0.33;
+    
     while(defined(my $DatRef = $CSVParser->getline($FileHandle))) {
         unless(defined($FPTSIdx) &&
                defined($PlayerIdx) &&
@@ -219,10 +231,26 @@ sub _loadStats {
                     $PlayerIdx = $Idx;
                 } elsif($HeaderVal eq 'Team' || $HeaderVal eq 'Avail') {
                     $TeamIdx = $Idx;
-                } elsif($HeaderVal eq 'AB') {
-                    $ABIdx = $Idx;
-                } elsif($HeaderVal eq 'BB') {
-                    $BBIdx = $Idx;
+                } elsif($HeaderVal eq 'R') {
+                    $RIdx = $Idx;
+                } elsif($HeaderVal eq 'HR') {
+                    $HrIdx = $Idx;
+                } elsif($HeaderVal eq 'RBI') {
+                    $RbiIdx = $Idx;
+                } elsif($HeaderVal eq 'SB') {
+                    $SbIdx = $Idx;
+                } elsif($HeaderVal eq 'OBP') {
+                    $ObpIdx = $Idx;
+                } elsif($HeaderVal eq 'W') {
+                    $WIdx = $Idx;
+                } elsif($HeaderVal eq 'S') {
+                    $SIdx = $Idx;
+                } elsif($HeaderVal eq 'K') {
+                    $KIdx = $Idx;
+                } elsif($HeaderVal eq 'ERA') {
+                    $EraIdx = $Idx;
+                } elsif($HeaderVal eq 'WHIP') {
+                    $WhipIdx = $Idx;
                 }
             }
             next;
@@ -230,9 +258,21 @@ sub _loadStats {
         
         my ($Name, $Team, $FPTS) = @{$DatRef}[$PlayerIdx, $TeamIdx, $FPTSIdx];
         next unless(defined($Name) && defined($Team) && defined($FPTS));
-        
-        my $AB = (defined $ABIdx ? $DatRef->[$ABIdx] : undef);
-        my $BB = (defined $BBIdx ? $DatRef->[$BBIdx] : undef);
+
+        my $RVal    = (defined($RIdx) ? $DatRef->[$RIdx] : 0);
+        my $HrVal   = (defined($HrIdx) ? $DatRef->[$HrIdx] : 0);
+        my $RbiVal  = (defined($RbiIdx) ? $DatRef->[$RbiIdx] : 0);
+        my $SbVal   = (defined($SbIdx) ? $DatRef->[$SbIdx] : 0);
+        my $ObpVal  = (defined($ObpIdx) ? $DatRef->[$ObpIdx] : 0);
+
+        my $WVal    = (defined($WIdx) ? $DatRef->[$WIdx] : 0);
+        my $SVal    = (defined($SIdx) ? $DatRef->[$SIdx] : 0);
+        my $KVal    = (defined($KIdx) ? $DatRef->[$KIdx] : 0);
+        my $EraVal  = (defined($EraIdx) ? $DatRef->[$EraIdx] : 0);
+        my $WhipVal = (defined($WhipIdx) ? $DatRef->[$WhipIdx] : 0);
+
+        $EraVal  = 1.0 / $EraVal  unless($EraVal == 0.0);
+        $WhipVal = 1.0 / $WhipVal unless($WhipVal == 0.0);        
         
         $Name = Player->_modName($Name);
         
@@ -242,16 +282,23 @@ sub _loadStats {
         }
         
         $Player->addPos($Position);
-        
-        if($Rebalance) {
-            if(defined($AB) && defined($BB)) {
-                $Player->[$PTSIDX] = $FPTS * SEASON_PA / ($AB + $BB + 1);
-            } else {
-                $Player->[$PTSIDX] = $FPTS;
-            }
-        } else {
-            $Player->[$PTSIDX] = $FPTS;
-        }
+
+        ## Temporary!  The depth charts don't seem to be available!
+        $Player->activate();
+
+        $Player->[$PTSIDX]
+            = $RVal * $RWgt
+            + $HrVal * $HrWgt
+            + $RbiVal * $RbiWgt
+            + $SbVal * $SbWgt
+            + $ObpVal * $ObpWgt
+
+            + $WVal * $WWgt
+            + $SVal * $SWgt
+            + $KVal * $KWgt
+            + $EraVal * $EraWgt
+            + $WhipVal * $WhipWgt;
+
         $Player->_reweight();
         
         if($Team ne 'Free Agent' &&
